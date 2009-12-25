@@ -1,0 +1,218 @@
+Welcome to CL-TCOD, an interface between Common Lisp and the Doryen Library
+("libtcod"), a portable truecolour console library intended for use with
+roguelike games.
+
+CL-TCOD consists of 2 files:
+
+1. TCOD.LISP, a lisp file which creates lisp bindings for C functions in the
+   compiled libtcod library, using the "CFFI" lisp foreign function interface.
+
+2. TCOD.ASD, which allows TCOD to be easily loaded and used as a library by
+   other common lisp programs, via the "ASDF" library-loading facility.
+   
+CL-TCOD has been tested with SBCL 1.0.25, CLISP 2.44, and Clozure 1.3 on
+Linux. It should work on any common lisp implementation where CFFI works.
+
+**Note** that it has not been used on a Mac; if you do this you may need to
+tell CFFI what the name of the compiled libtcod library under MacOS is. To do
+this, open tcod.lisp in an editor, find the '(define-foreign-library...'
+clause, uncomment the '(:macintosh...)' line and change the string on that line
+to the name of the libtcod library file.
+
+
+    
+=======
+Licence
+=======
+
+The CL-TCOD package is placed in the Public Domain by its author.
+
+
+
+=====================
+Hints on installation
+=====================
+
+
+You need to know your way around your chosen common lisp and how to install and
+load lisp libraries before proceeding. You also need to have a version of
+libtcod newer than 1.4.1rc2, which is the first version that includes the
+'wrappers.c' and 'wrappers.h' source files that allow CL-TCOD to interface with
+libtcod.
+
+1. Ensure you have a working common lisp installation. 
+2. Ensure the ASDF lisp library is installed.
+3. If CFFI is not installed (see above), download and install it somewhere ASDF can
+   find it.
+4. Put the CL-TCOD files in a directory where ASDF can find them.
+5. Make sure libtcod is installed and compiled. Make sure the libtcod
+   dynamically linked library (.DLL or .SO file) is somewhere your lisp system
+   can find it. It probably is, but if CFFI complains about being unable to
+   find the library, you can either copy it to an appropriate directory or add
+   its directory to the list variable cffi:*foreign-library-directories*
+   e.g. by typing the following in the lisp interpreter:
+
+   (push #P"/my/libtcod/directory/" cffi:*foreign-library-directories*)
+
+6. Start lisp. Load ASDF, CFFI, and finally CL-TCOD:
+
+   (asdf:oos 'asdf:load-op :tcod)
+
+7. Type something like the following commands at the lisp prompt to start using TCOD
+from within Lisp:
+
+   (tcod:console-set-custom-font "myfont.bmp" :font-layout-ascii-in-row 16 16)
+   (tcod:console-init-root 80 25 "Test" nil)
+   (tcod:console-clear tcod:*root*)
+   (tcod:console-print-left tcod:*root* 1 1 :set "Hello, world!~%")
+   (tcod:console-flush)
+
+
+
+
+=======================================
+Differences between CL-TCOD and libtcod
+=======================================
+
+
+1. Naming conventions
+   ------------------
+
+The C function 'TCOD_foobar' corresponds to the lisp function 'foobar', which is in
+the 'tcod' package (and so requires a prefix of 'tcod:' to access in most
+situations). Underscores become hyphens. So:
+
+  TCOD_foobar_function(a, b)     <===>    (tcod:foobar-function a b)
+
+"Predicate functions" are functions whose main job is to return a boolean value (true or
+false) that answers a question. These have a terminal '?' added to their name:
+
+  TCOD_console_is_fullscreen()   <===>    (tcod:console-is-fullscreen?)
+
+C enums have generally more succinct names. As they are lisp keywords, their
+names all begin with ':'. THey are named according to the following pattern:
+
+  TCODK_BACKSPACE (etc)         <===>  :backspace
+  TCOD_CHAR_HLINE  (etc)        <===>  :char-hline
+  TCOD_COLCTRL_1  (etc)         <===>  :colctrl-1
+  TCOD_BKGND_SET (etc)          <===>  :set
+  TCOD_FONT_LAYOUT_ASCII_INCOL  <===>  :font-layout-ascii-in-col 
+  FOV_SHADOW                    <===>  :fov-shadow
+  TCOD_KEY_PRESSED              <===>  :key-pressed
+  CENTER                        <===>  :center
+
+In general, all functions exist in both U.S. and non-U.S. spellings, This is
+mainly relevant to those functions with colour/color in their name.
+
+
+2. Colournums
+   ----------
+
+In libtcod, colours are represented as structures containing three integer
+values: red, green and blue (each 0-255). The name of the structure type is
+TCOD_color_t.
+
+In CL-TCOD, these colour structs are converted into 3-byte integers using the C
+functions int_to_color(int) and color_to_int(TCOD_color_t), both defined in
+wrappers.c. The 3 bytes are red, green and blue in order (blue is 1's). ie:
+
+    /* C */                              ;; lisp ;;
+   struct TCOD_color_t {r, g, b}  <==>   #x00RRGGBB
+
+So, for example, one way to use the function TCOD_color_multiply_scalar from
+lisp is:
+
+  (tcod:color-multiply-scalar (tcod:compose-colour 218 165 32) 0.5)
+
+All C functions that take or return TCOD_color_t structs, are wrapped by lisp
+functions that take or return integers as described above.
+
+
+3. Colours by keyword
+   ------------------
+
+A lisp keyword is any symbol beginning with ':'. In lisp, keywords (like all
+symbols) are first-class values and can be passed around just like any other
+value. CL-TCOD uses keywords to refer to particular colours, for example the
+keyword :cyan refers to the colour #x0056A3CD (or 5678029 in decimal notation).
+
+You can use keywords instead of colournums as arguments to lisp functions, by
+using the function COLOUR to return the colournum associated with a keyword:
+
+  (tcod:colour :cyan)    -->    5678029
+
+
+You can also define your own colour names, like so:
+
+  (tcod:make-colour :my-goldenrod 218 165 32)
+  (tcod:color-multiply-scalar (tcod:colour :my-goldenrod) 0.5)
+
+CL-TCOD knows all the colour names defined in the 'rgb.txt' file under Xwindows
+(Unix/Linux), eg :navajo-white, :honeydew, :mint-cream, and so on. There is
+nothing special about the fact that rgb.txt comes from Xwindows -- the colours
+are just named R,G,B values and can be used anywhere that CL-TCOD can be
+used. Look in the source file 'tcod-colours.lisp' to see the available colour
+names.
+
+
+4. Lisp format versus C printf
+   ---------------------------
+   
+  The TCOD functions that accept 'printf'-like string-formatting arguments,
+  have been modified to instead accept arguments to Common Lisp's 'format'
+  function.'  For example:
+
+    TCOD_console_print_left (con, x, y, TCOD_BKGND_SET,
+      "Printing at %d, %d\n", x, y);
+
+    becomes:
+
+    (tcod:console-print-left con x y :set "Printing at ~D, ~D~%" x y)
+
+    
+4. Miscellaneous extra functions
+   -----------------------------
+   
+  (tcod:console-print-double-frame CONSOLE X Y W H EMPTY? STRING...)
+  
+     - Like console-print-frame, but draws using "double-line"
+       characters.
+     
+
+=========
+Resources
+=========
+
+
+The latest version of CL-TCOD is available at:
+
+    http://bitbucket.org/moriarty4/cl-tcod/
+
+The latest version of libtcod is available at:
+
+    http://doryen.eptalys.net/libtcod/
+
+This Common Lisp package depends on CFFI, the Common Foreign Function Interface:
+
+    http://common-lisp.net/project/cffi/
+
+Learn Common Lisp (free book):
+
+    http://www.gigamonkeys.com/book/
+
+Full-featured, free Common Lisp implementations:
+
+    http://www.sbcl.org (compiles to machine code)
+    http://clisp.cons.org (bytecode compiler, but the friendliest on Win32)
+    http://ccl.clozure.com (compiles to machine code; version 1.3 recently released
+    			    for 32-bit intel systems i.e. linux and windows)
+    
+"Lisp in a Box" -- aims to make it easy to start using Common Lisp by providing
+a single download with everything set up in advance:
+
+    http://common-lisp.net/project/lispbox/
+
+Help & advice with lisp:
+
+    http://www.lispforum.com
+
