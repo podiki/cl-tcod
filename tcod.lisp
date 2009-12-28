@@ -758,6 +758,14 @@ or :FONT-LAYOUT-TCOD."
 	(con console) (x :int) (y :int) (c :unsigned-char)
 	(fg colournum) (bg colournum))
 
+;; wrapper to TCOD_console_put_char_ex is currently only in SVN
+(unless (cffi:foreign-symbol-pointer "TCOD_console_put_char_ex_wrapper")
+  (defun console-put-char-ex (con x y c fg bg)
+    (console-set-fore con x y fg)
+    (console-set-back con x y fg)
+    (console-set-char con x y c)))
+
+    
 ;;TCODLIB_API void TCOD_console_print_left(TCOD_console_t con,int x, int y,
 ;;                                         TCOD_bkgnd_flag_t flag,
 ;;                                         const char *fmt, ...); 
@@ -912,9 +920,10 @@ or :FONT-LAYOUT-TCOD."
 ;;TCODLIB_API void TCOD_console_flush();
 (defcfun ("TCOD_console_flush" console-flush) :void)
 
-;; (sys-flush t) forces a redraw of the whole root console.
+;; (sys-flush t) forces an 'update' of the system timer, FPS, etc.
+;; If render is true, also forces an update of the root console.
 (defcfun ("TCOD_sys_flush" sys-flush) :void
-	(flag :boolean))
+	(render :boolean))
 
 ;;TCODLIB_API void TCOD_console_set_color_control(TCOD_colctrl_t con,
 ;;     TCOD_color_t fore, TCOD_color_t back);
