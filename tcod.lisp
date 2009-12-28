@@ -58,6 +58,7 @@
    #:console-print-centre-rect
    #:console-print-frame
    #:console-print-double-frame
+   #:legal-console-coordinates?
    #:console-put-char
    #:console-put-char-ex
    #:console-set-char
@@ -710,18 +711,40 @@ or :FONT-LAYOUT-TCOD."
 ;;TCODLIB_API void TCOD_console_set_back(TCOD_console_t con,int x, int y,
 ;;                                       TCOD_color_t col,
 ;;                                       TCOD_bkgnd_flag_t flag);
-(defcfun ("TCOD_console_set_back_wrapper" console-set-back) :void
+(defcfun ("TCOD_console_set_back_wrapper" %console-set-back) :void
   (con console) (x :int) (y :int) (col colournum) (flag background-flag))
+
+
+(defun console-set-back (con x y col flag)
+  ;; Assertion in libtcod
+  (assert (legal-console-coordinates? con x y))
+  (%console-set-back con x y col flag))
+
 
 ;;TCODLIB_API void TCOD_console_set_fore(TCOD_console_t con,int x, int y,
 ;;                                       TCOD_color_t col);
-(defcfun ("TCOD_console_set_fore_wrapper" console-set-fore) :void
+(defcfun ("TCOD_console_set_fore_wrapper" %console-set-fore) :void
   (con console) (x :int) (y :int) (col colournum))
- 
+
+
+(defun console-set-fore (con x y col)
+  ;; Assertion in libtcod
+  (assert (legal-console-coordinates? con x y))
+  (%console-set-fore con x y col))
+
+
+
 ;;TCODLIB_API void TCOD_console_set_char(TCOD_console_t con,int x, int y,
 ;; int c);
-(defcfun ("TCOD_console_set_char" console-set-char) :void
+(defcfun ("TCOD_console_set_char" %console-set-char) :void
   (con console) (x :int) (y :int) (c :unsigned-char))
+
+
+(defun console-set-char (con x y ch)
+  ;; Assertion in libtcod
+  (assert (legal-console-coordinates? con x y))
+  (%console-set-char con x y ch))
+
 
 ;;TCODLIB_API void TCOD_console_put_char(TCOD_console_t con,int x, int y,
 ;;                                       int c, TCOD_bkgnd_flag_t flag);
@@ -758,9 +781,12 @@ or :FONT-LAYOUT-TCOD."
 
 ;;TCODLIB_API void TCOD_console_print_right(TCOD_console_t con,int x, int y,
 ;; TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
-(defcfun ("TCOD_console_print_right" console-print-right) :void
+(defcfun ("TCOD_console_print_right" %console-print-right) :void
 	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
 	&rest)
+
+(defun console-print-right (con x y flag fmt &rest args)
+  (%console-print-right con x y flag (apply #'format nil fmt args)))
 
 ;;TCODLIB_API void TCOD_console_print_center(TCOD_console_t con,int x, int y,
 ;; TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
@@ -829,17 +855,44 @@ or :FONT-LAYOUT-TCOD."
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_back(TCOD_console_t con,int x, int y)
-(defcfun ("TCOD_console_get_back_wrapper" console-get-back) colournum
+(defcfun ("TCOD_console_get_back_wrapper" %console-get-back) colournum
   (con console) (x :int) (y :int))
+
+
+(defun legal-console-coordinates? (con x y)
+  (and (not (null-pointer-p con))
+       (< x (console-get-width con))
+       (< y (console-get-height con))))
+
+
+(defun console-get-back (con x y)
+  ;; Assertion in libtcod
+  (assert (legal-console-coordinates? con x y))
+  (%console-get-back con x y))
+
 
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_fore(TCOD_console_t con,
 ;;                                               int x, int y);
-(defcfun ("TCOD_console_get_fore_wrapper" console-get-fore) colournum
+(defcfun ("TCOD_console_get_fore_wrapper" %console-get-fore) colournum
   (con console) (x :int) (y :int))
 
+
+(defun console-get-fore (con x y)
+  ;; Assertion in libtcod
+  (assert (legal-console-coordinates? con x y))
+  (%console-get-fore con x y))
+
+  
 ;;TCODLIB_API int TCOD_console_get_char(TCOD_console_t con,int x, int y);
-(defcfun ("TCOD_console_get_char" console-get-char) :unsigned-char
+(defcfun ("TCOD_console_get_char" %console-get-char) :unsigned-char
   (con console) (x :int) (y :int))
+
+
+(defun console-get-char (con x y)
+  ;; Assertion in libtcod
+  (assert (legal-console-coordinates? con x y))
+  (%console-get-char con x y))
+
 
 ;;TCODLIB_API void TCOD_console_set_fade(uint8 val, TCOD_color_t fade);
 (defcfun ("TCOD_console_set_fade_wrapper" console-set-fade) :void
@@ -937,13 +990,39 @@ or :FONT-LAYOUT-TCOD."
 
 ;;TCODLIB_API void TCOD_console_blit(TCOD_console_t src,int xSrc, int ySrc,
 ;; int wSrc, int hSrc, TCOD_console_t dst, int xDst, int yDst, int fade);
-(defcfun ("TCOD_console_blit" console-blit) :void
+(defcfun ("TCOD_console_blit" %console-blit) :void
   (src console)
   (xsrc :int) (ysrc :int)
   (wsrc :int) (hsrc :int)
   (dest console)
   (xdest :int) (ydest :int)
   (foreground-alpha :float) (background-alpha :float))
+
+
+(defun console-blit (src xsrc ysrc wsrc hsrc dest xdest ydest
+                     foreground-alpha background-alpha)
+  (check-type xsrc (integer 0))
+  (check-type ysrc (integer 0))
+  (check-type wsrc (integer 0))
+  (check-type hsrc (integer 0))
+  (check-type xdest (integer 0))
+  (check-type ydest (integer 0))
+  (check-type foreground-alpha (real 0 1.0))
+  (check-type background-alpha (real 0 1.0))
+  ;; Blitting a console to a position that lies completely outside the
+  ;; destination console's bounds will do nothing, rather than causing
+  ;; an error.
+  (unless (or (>= xdest (console-get-width dest))
+              (>= ydest (console-get-height dest)))
+    ;; TCOD_console_blit unceremoniously crashes libtcod if this assertion
+    ;; is not true when it is called. We therefore check the assertion here
+    ;; first, so we have access to debugging facilities if the conditions
+    ;; are not met.
+    (assert (and (plusp wsrc) (plusp hsrc)
+                 (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
+    (%console-blit src xsrc ysrc wsrc hsrc dest xdest ydest
+                   foreground-alpha background-alpha)))
+
 
 ;;TCODLIB_API void TCOD_console_delete(TCOD_console_t console);
 (defcfun ("TCOD_console_delete" console-delete) :void
