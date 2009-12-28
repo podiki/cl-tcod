@@ -181,6 +181,11 @@
 
 (setf cffi:*default-foreign-encoding* :iso-8859-1)
 
+;;; uncomment this form if using pre 1.4.3b1 version of libtcod
+;;;(eval-when (:compile-toplevel :load-toplevel :execute)
+;;;  (pushnew :libtcod-old *features*))
+ 
+ 
 (define-foreign-library libtcod
 	(:unix "libtcod.so")
 	(:windows "libtcod-mingw.dll")
@@ -754,16 +759,17 @@ or :FONT-LAYOUT-TCOD."
 
 ;;TCODLIB_API void TCOD_console_put_char_ex(TCOD_console_t con,int x, int y,
 ;;                                          int c, TCOD_bkgnd_flag_t flag);
+#-libtcod-old
 (defcfun ("TCOD_console_put_char_ex_wrapper" console-put-char-ex) :void
 	(con console) (x :int) (y :int) (c :unsigned-char)
 	(fg colournum) (bg colournum))
 
 ;; wrapper to TCOD_console_put_char_ex is currently only in SVN
-(unless (cffi:foreign-symbol-pointer "TCOD_console_put_char_ex_wrapper")
-  (defun console-put-char-ex (con x y c fg bg)
+#+libtcod-old
+(defun console-put-char-ex (con x y c fg bg)
     (console-set-fore con x y fg)
-    (console-set-back con x y fg)
-    (console-set-char con x y c)))
+    (console-set-back con x y bg :set)
+    (console-set-char con x y c))
 
     
 ;;TCODLIB_API void TCOD_console_print_left(TCOD_console_t con,int x, int y,
@@ -837,15 +843,45 @@ or :FONT-LAYOUT-TCOD."
 
 ;;TCODLIB_API void TCOD_console_print_frame(TCOD_console_t con,int x,int y,
 ;; int w,int h, bool empty, const char *fmt, ...);
+#-libtcod-old
 (defcfun ("TCOD_console_print_frame" console-print-frame) :void
   (con console) (x :int) (y :int) (w :int) (h :int)
-  (empty? :boolean) (flag background-flag) (fmt :string) &rest)
+  (empty? :boolean) (flag background-flag) 
+  (fmt :string) &rest)
+
+#+libtcod-old
+(defcfun ("TCOD_console_print_frame" %console-print-frame) :void
+  (con console) (x :int) (y :int) (w :int) (h :int)
+  (empty? :boolean) (fmt :string) &rest)
+
+  
+#+libtcod-old
+(defun console-print-frame (con x y w h empty? flag fmt &rest args)
+  (declare (ignore flag))
+  (%console-print-frame con x y w h empty? 
+    (if (stringp fmt) (apply #'format nil fmt args) +NULL+)))
+  
 
 ;; Added in wrappers.c
+#-libtcod-old
 (defcfun ("TCOD_console_print_double_frame" console-print-double-frame) :void
   (con console) (x :int) (y :int) (w :int) (h :int)
-  (empty? :boolean) (flag background-flag) (fmt :string) &rest)
+  (empty? :boolean) (flag background-flag) 
+  (fmt :string) &rest)
 
+#+libtcod-old
+(defcfun ("TCOD_console_print_double_frame" %console-print-double-frame) :void
+  (con console) (x :int) (y :int) (w :int) (h :int)
+  (empty? :boolean) (fmt :string) &rest)
+
+  
+#+libtcod-old
+(defun console-print-double-frame (con x y w h empty? flag fmt &rest args)
+  (declare (ignore flag))
+  (%console-print-double-frame con x y w h empty? 
+    (if (stringp fmt) (apply #'format nil fmt args) +NULL+)))
+
+  
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_background_color(TCOD_console_t con);
 (defcfun ("TCOD_console_get_background_color"
 	  console-get-background-color) colournum
@@ -922,6 +958,7 @@ or :FONT-LAYOUT-TCOD."
 
 ;; (sys-flush t) forces an 'update' of the system timer, FPS, etc.
 ;; If render is true, also forces an update of the root console.
+#-libtcod-old
 (defcfun ("TCOD_sys_flush" sys-flush) :void
 	(render :boolean))
 

@@ -18,9 +18,7 @@ CL-TCOD consists of the following files:
 
 5. PARSE-RGB.ASD, ASDF system definition file for PARSE-RGB.LISP
 
-CL-TCOD has been tested with SBCL 1.0.32, CLISP 2.48, and Clozure 1.4 on Linux;
-and with CLISP 2.48 on Windows XP. It should work on any common lisp
-implementation where CFFI works.
+CL-TCOD has been tested with SBCL 1.0.32 and Clozure 1.4 on Linux. 
 
 **Note** that it has not been used on a Mac; if you do this you may need to
 tell CFFI what the name of the compiled libtcod library under MacOS is. To do
@@ -84,7 +82,7 @@ from within Lisp:
    (tcod:console-init-root 80 25 "Test" nil)
    (tcod:console-clear tcod:*root*)
    (tcod:console-print-left tcod:*root* 1 1 :set "Hello, world!~%")
-   (tcod:console-flush)
+   (tcod:console-wait-for-keypress t)
 
 
 
