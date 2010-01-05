@@ -843,23 +843,23 @@ or :FONT-LAYOUT-TCOD."
 
 ;;TCODLIB_API void TCOD_console_print_frame(TCOD_console_t con,int x,int y,
 ;; int w,int h, bool empty, const char *fmt, ...);
-#-libtcod-old
+;;#-libtcod-old
 (defcfun ("TCOD_console_print_frame" console-print-frame) :void
   (con console) (x :int) (y :int) (w :int) (h :int)
   (empty? :boolean) (flag background-flag) 
   (fmt :string) &rest)
 
-#+libtcod-old
-(defcfun ("TCOD_console_print_frame" %console-print-frame) :void
-  (con console) (x :int) (y :int) (w :int) (h :int)
-  (empty? :boolean) (fmt :string) &rest)
+;; #+libtcod-old
+;; (defcfun ("TCOD_console_print_frame" %console-print-frame) :void
+;;   (con console) (x :int) (y :int) (w :int) (h :int)
+;;   (empty? :boolean) (fmt :string) &rest)
 
   
-#+libtcod-old
-(defun console-print-frame (con x y w h empty? flag fmt &rest args)
-  (declare (ignore flag))
-  (%console-print-frame con x y w h empty? 
-    (if (stringp fmt) (apply #'format nil fmt args) +NULL+)))
+;; #+libtcod-old
+;; (defun console-print-frame (con x y w h empty? flag fmt &rest args)
+;;   (declare (ignore flag))
+;;   (%console-print-frame con x y w h empty? 
+;;     (if (stringp fmt) (apply #'format nil fmt args) +NULL+)))
   
 
 ;; Added in wrappers.c
