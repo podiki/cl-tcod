@@ -760,18 +760,25 @@ or :FONT-LAYOUT-TCOD."
 ;;TCODLIB_API void TCOD_console_put_char_ex(TCOD_console_t con,int x, int y,
 ;;                                          int c, TCOD_bkgnd_flag_t flag);
 #-libtcod-old
-(defcfun ("TCOD_console_put_char_ex_wrapper" console-put-char-ex) :void
+(defcfun ("TCOD_console_put_char_ex_wrapper" %console-put-char-ex) :void
 	(con console) (x :int) (y :int) (c :unsigned-char)
 	(fg colournum) (bg colournum))
 
 ;; wrapper to TCOD_console_put_char_ex is currently only in SVN
 #+libtcod-old
-(defun console-put-char-ex (con x y c fg bg)
+(defun %console-put-char-ex (con x y c fg bg)
     (console-set-fore con x y fg)
     (console-set-back con x y bg :set)
     (console-set-char con x y c))
 
-    
+
+(defun console-put-char-ex (con x y c fg bg)
+  (assert (and (not (null-pointer-p con))
+               (< x (console-get-width con))
+               (< y (console-get-height con))))
+  (%console-put-char-ex con x y c fg bg))
+
+
 ;;TCODLIB_API void TCOD_console_print_left(TCOD_console_t con,int x, int y,
 ;;                                         TCOD_bkgnd_flag_t flag,
 ;;                                         const char *fmt, ...); 
