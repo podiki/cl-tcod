@@ -155,12 +155,39 @@
    #:random-new
    #:random-get-int
    #:random-get-float
-   ;; == Noise ==
+   ;; (@> "Noise") ============================================================
    #:noise-new
    #:noise-perlin
+   #:noise-simplex
    #:noise-fbm-perlin
    #:noise-turbulence-perlin
    #:noise-delete
+   ;; (@> "Heightmap") ========================================================
+   #:heightmap
+   #:heightmap-new
+   #:heightmap-get-value
+   #:heightmap-get-interpolated-value
+   #:heightmap-get-slope
+   #:heightmap-set-value
+   #:heightmap-add
+   #:heightmap-add-fbm
+   #:heightmap-scale
+   #:heightmap-lerp
+   #:heightmap-add-hm
+   #:heightmap-multiply-hm
+   #:heightmap-clear
+   #:heightmap-delete
+   #:heightmap-clamp
+   #:heightmap-count-cells
+   #:heightmap-has-land-on-border?
+   #:heightmap-get-min
+   #:heightmap-get-max
+   #:heightmap-normalize
+   #:heightmap-normalise
+   #:heightmap-copy
+   #:heightmap-dig-bezier
+   #:heightmap-dig-line
+   #:heightmap-rain-erosion
    ;; == System layer ==
    #:sys-save-screenshot
    #:sys-sleep-milli
@@ -1282,9 +1309,9 @@ or :FONT-LAYOUT-TCOD."
 ;;  int y);
 
 
-;;; ========
-;;;  Noise
-;;; ========
+
+;;;;  (@> "Noise") ============================================================
+
 
 (defctype noise :pointer)
 
@@ -1310,6 +1337,17 @@ or :FONT-LAYOUT-TCOD."
     (dotimes (i (length nums))
       (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
     (%noise-perlin noise f)))
+
+
+;; simplex noise
+(defcfun ("TCOD_noise_simplex" %noise-simplex) :float
+  (noise noise) (f :pointer))
+
+(defun noise-simplex (noise &rest nums)
+  (with-foreign-object (f :float (length nums))
+    (dotimes (i (length nums))
+      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+    (%noise-simplex noise f)))
 
 
 ;; // fractional brownian motion
@@ -1341,5 +1379,146 @@ or :FONT-LAYOUT-TCOD."
 (defcfun ("TCOD_noise_delete" noise-delete) :void
   (noise noise))
 
+
+;;;; (@> "Heightmap") =========================================================
+
+
+
+(defctype heightmap :pointer)
+
+
+(defcfun ("TCOD_heightmap_new" heightmap-new) heightmap
+  (width :int) (height :int))
+
+
+(defcfun ("TCOD_heightmap_get_value" heightmap-get-value) :float 
+  ;; 0 <= x < WIDTH
+  (heightmap heightmap) (x :int) (y :int))
+
+
+(defcfun ("TCOD_heightmap_get_interpolated_value"
+          heightmap-get-interpolated-value) :float 
+  ;; 0 <= x < WIDTH
+  (heightmap heightmap) (x :float) (y :float))
+
+
+(defcfun ("TCOD_heightmap_get_slope" heightmap-get-slope) :float 
+  (heightmap heightmap) (x :int) (y :int))
+
+
+(defcfun ("TCOD_heightmap_set_value" heightmap-set-value) :void
+  ;; 0 <= x < WIDTH
+  (heightmap heightmap) (x :int) (y :int) (value :float))
+
+
+(defcfun ("TCOD_heightmap_add" heightmap-add) :void
+  (heightmap heightmap) (value :float))
+
+
+(defcfun ("TCOD_heightmap_add_fbm" heightmap-add-fbm) :void
+  (heightmap heightmap) (noise noise) (mulx :float) (muly :float)
+  (addx :float) (addy :float) (octaves :float) (delta :float) (scale :float))
+
+
+(defcfun ("TCOD_heightmap_scale" heightmap-scale) :void
+  (heightmap heightmap) (factor :float))
+
+
+(defcfun ("TCOD_heightmap_lerp_hm" heightmap-lerp) :void
+  (hm1 heightmap) (hm2 heightmap) (result heightmap) (coef :float))
+
+
+(defcfun ("TCOD_heightmap_add_hm" heightmap-add-hm) :void
+  (hm1 heightmap) (hm2 heightmap) (result heightmap))
+
+
+(defcfun ("TCOD_heightmap_multiply_hm" heightmap-multiply-hm) :void
+  (hm1 heightmap) (hm2 heightmap) (result heightmap))
+
+
+(defcfun ("TCOD_heightmap_clear" heightmap-clear) :void
+  (heightmap heightmap))
+
+
+(defcfun ("TCOD_heightmap_delete" heightmap-delete) :void
+  (heightmap heightmap))
+
+
+(defcfun ("TCOD_heightmap_clamp" heightmap-clamp) :void
+  (heightmap heightmap) (min :float) (max :float))
+
+
+(defcfun ("TCOD_heightmap_count_cells" heightmap-count-cells) :int
+  (heightmap heightmap) (min :float) (max :float))
+
+
+(defcfun ("TCOD_heightmap_has_land_on_border"
+          heightmap-has-land-on-border?) :boolean
+  (heightmap heightmap) (waterlevel :float))
+
+
+(defcfun ("TCOD_heightmap_get_minmax" %heightmap-get-minmax) :void
+  (heightmap heightmap) (minfloat :pointer) (maxfloat :pointer))
+
+
+(defun heightmap-get-min (heightmap)
+  (with-foreign-object (minf :float)
+    (with-foreign-object (maxf :float)
+      (%heightmap-get-minmax heightmap minf maxf)
+      (mem-aref minf :float))))
+
+
+(defun heightmap-get-max (heightmap)
+  (with-foreign-object (minf :float)
+    (with-foreign-object (maxf :float)
+      (%heightmap-get-minmax heightmap minf maxf)
+      (mem-aref maxf :float))))
+
+
+
+(defcfun ("TCOD_heightmap_normalize" heightmap-normalize) :void
+  (heightmap heightmap) (min :float) (max :float))
+
+
+(defun heightmap-normalise (heightmap min max)
+  (heightmap-normalize heightmap min max))
+
+
+(defcfun ("TCOD_heightmap_copy" heightmap-copy) :void
+  (source heightmap) (dest heightmap))
+
+
+(defcfun ("TCOD_heightmap_rain_erosion" %heightmap-rain-erosion) :void
+  (heightmap heightmap) (num-drops :int) (erosion-coef :float)
+  (sediment-coef :float) (randomptr :pointer))
+
+
+(defun heightmap-rain-erosion (heightmap num-drops erosion sedimentation
+                               &optional (rng +NULL+))
+  (%heightmap-rain-erosion heightmap num-drops erosion sedimentation rng))
+
+
+(defcfun ("TCOD_heightmap_dig_bezier" %heightmap-dig-bezier) :void
+  (heightmap heightmap) (px :pointer) (py :pointer) (start-radius :float)
+  (start-depth :float) (end-radius :float) (end-depth :float))
+
+
+(defun heightmap-dig-bezier (heightmap coords start-radius start-depth
+                             end-radius end-depth)
+  (with-foreign-object (px :int 4)
+    (with-foreign-object (py :int 4)
+      (dotimes (i 4)
+        (assert (realp (car (nth i coords))))
+        (assert (realp (cdr (nth i coords))))
+        (setf (mem-aref px :int i) (coerce (car (nth i coords)) 'integer))
+        (setf (mem-aref py :int i) (coerce (cdr (nth i coords)) 'integer)))
+      (%heightmap-dig-bezier heightmap px py ;(mem-ref px :int) (mem-ref py :int)
+                             start-radius start-depth
+                             end-radius end-depth))))
+
+
+(defun heightmap-dig-line (heightmap x1 y1 x2 y2 radius depth)
+  (heightmap-dig-bezier heightmap `((,x1 . ,y1) (,x1 . ,y1) (,x2 . ,y2) (,x2 . ,y2))
+                        radius depth radius depth))
 
 
