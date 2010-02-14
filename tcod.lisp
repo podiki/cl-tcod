@@ -21,7 +21,7 @@
   (:export
    #:*root*
    #:+null+
-   ;; == Colours ==
+   ;; (@> "Colour") ===========================================================
    #:start-colours
    #:start-colors
    #:colour
@@ -33,7 +33,23 @@
    #:invert-color
    #:colour->grayscale
    #:color->grayscale
-   ;; == Console ==
+   #:colour-set-hsv
+   #:colour-get-hsv
+   #:colour-equals?
+   #:colour-add
+   #:colour-multiply
+   #:colour-multiply-scalar
+   #:colour-lerp
+   #:make-colour
+   #:color-set-hsv
+   #:color-get-hsv
+   #:color-equals?
+   #:color-add
+   #:color-multiply
+   #:color-multiply-scalar
+   #:color-lerp
+   #:make-color
+   ;; (@> "Console") ==========================================================
    #:console-wait-for-keypress
    #:console-check-for-keypress
    #:console-set-colour-control
@@ -65,6 +81,8 @@
    #:console-set-fore
    #:console-set-back
    #:console-clear
+   #:console-fill-char
+   #:console-set-dirty
    #:console-set-foreground-colour
    #:console-set-background-colour
    #:console-set-foreground-color
@@ -78,22 +96,6 @@
    #:console-set-custom-font
    #:console-set-window-title
    #:console-rect
-   #:colour-set-hsv
-   #:colour-get-hsv
-   #:colour-equals?
-   #:colour-add
-   #:colour-multiply
-   #:colour-multiply-scalar
-   #:colour-lerp
-   #:make-colour
-   #:color-set-hsv
-   #:color-get-hsv
-   #:color-equals?
-   #:color-add
-   #:color-multiply
-   #:color-multiply-scalar
-   #:color-lerp
-   #:make-color
    #:keycode
    #:drawing-character
    #:colctrl
@@ -122,7 +124,7 @@
    #:console-blit
    ;; == Unicode ==
    ;; todo not yet implemented
-   ;; == Mouse ==
+   ;; (@> "Mouse") ============================================================
    #:mouse
    #:make-mouse
    #:mouse-x
@@ -142,7 +144,7 @@
    #:mouse-flags
    #:mouse-move
    #:mouse-get-status
-   ;; == Image ==
+   ;; (@> "Image") ============================================================
    #:image-load
    #:image-save
    #:image-from-console
@@ -151,8 +153,10 @@
    #:image-blit
    #:image-set-key-color
    #:image-set-key-colour
-   ;; == Random ==
+   ;; (@> "Random") ===========================================================
    #:random-new
+   #:random-get-instance
+   #:random-delete
    #:random-get-int
    #:random-get-float
    ;; (@> "Noise") ============================================================
@@ -226,13 +230,24 @@
 		(use-foreign-library libtcod)
 		(setf *libtcod-loaded* t)))
 
+
+;;;; (@> "Utilities") =========================================================
+
+(defun get-bit (n pos)
+  "POS = 1 refers to the 1's bit"
+  (/= 0 (logand n (expt 2 (1- pos)))))
+
+
+
 (defvar *root* (null-pointer) "The root console.")
 (defparameter +NULL+ (null-pointer))
 (defconstant +NOISE-DEFAULT-HURST+ 0.5)
 (defconstant +NOISE-DEFAULT-LACUNARITY+ 2.0)
 
 
-;;; Foreign types.
+
+;;;; (@> "Types") =============================================================
+
 
 (defctype colournum :unsigned-int)
 
@@ -242,91 +257,6 @@
 	(b :uint8))
 
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun compose-colour (r g b)
-    "Given three integer values R, G and B, representing the red, green and
-blue components of a colour, return a 3 byte integer whose value is #xRRGGBB."
-    (+ (ash r 16) (ash g 8) b))
-  (defun compose-color (r g b) (compose-colour r g b)))
-
-
-(defun decompose-colour (num)
-  "Given a colournum #xRRGGBB, return R, G and B integer values
-as 3 separate return values."
-  (values
-	 (ash (logand num #xff0000) -16)
-	 (ash (logand num #x00ff00) -8)
-	 (logand num #x0000ff)))
-(defun decompose-color (num) (decompose-colour num))
-
-
-(defun invert-colour (num)
-  (multiple-value-bind (r g b) (decompose-colour num)
-    (compose-colour (- 255 r) (- 255 g) (- 255 b))))
-(defun invert-color (num) (invert-colour num))
-
-
-;; (defvar *black* (compose-colour 0 0 0))
-;; (defvar *dark-grey* (compose-colour 96 96 96))
-;; (defvar *grey* (compose-colour 196 196 196))
-;; (defvar *white* (compose-colour 255 255 255))
-;; (defvar *dark-blue* (compose-colour 40 40 128))
-;; (defvar *light-blue* (compose-colour 120 120 255))
-;; (defvar *dark-red* (compose-colour 128 0 0))
-;; (defvar *light-red* (compose-colour 255 100 50))
-;; (defvar *dark-brown* (compose-colour 32 16 0))
-;; (defvar *light-yellow* (compose-colour 255 255 150))
-;; (defvar *yellow* (compose-colour 255 255 0))
-;; (defvar *dark-yellow* (compose-colour 164 164 0))
-;; (defvar *green* (compose-colour 0 220 0))
-;; (defvar *orange* (compose-colour 255 150 0))
-;; (defvar *red* (compose-colour 255 0 0))
-;; (defvar *silver* (compose-colour 203 203 203))
-;; (defvar *gold* (compose-colour 255 255 102))
-;; (defvar *purple* (compose-colour 204 51 153))
-;; (defvar *dark-purple* (compose-colour 51 0 51))
-;; ;;; Colours not defined in TCOD.
-;; (defvar *slate-grey* (compose-colour #x80 #x80 #x80))
-;; (defvar *umber* (compose-colour #x80 #x40 0))
-;; (defvar *pink* (compose-colour 255 0 255))
-;; (defvar *chocolate* (compose-colour 210 105 30))
-;; ;;; ...etc...
-
-
-(defvar *colour-table* nil)
-(defvar *initial-colours*
-  `((:true-black	#x00 #x00 #x00)
-    (:true-pink		#xFF #x00 #xFF)
-    (:true-white	#xFF #xFF #xFF)
-    (:true-red		#xFF #x00 #x00)
-    (:true-green	#x00 #xFF #x00)
-    (:true-blue		#x00 #x00 #xFF)
-    (:black		#x00 #x00 #x00)
-    (:dark-grey 	96 96 96)
-    (:grey 		196 196 196)
-    (:white 		255 255 255)
-    (:blue		13 103 196)
-    (:dark-blue 	40 40 128)
-    (:light-blue 	120 120 255)
-    (:dark-red 		128 0 0)
-    (:light-red 	255 100 50)
-    (:dark-brown 	32 16 0)
-    (:light-yellow 	255 255 150)
-    (:yellow 		255 255 0)
-    (:dark-yellow 	164 164 0)
-    (:green 		0 220 0)
-    (:cyan		86 163 205)
-    (:orange 		255 150 0)
-    (:red 		255 0 0)
-    (:silver 		203 203 203)
-    (:gold 		255 255 102)
-    (:purple 		204 51 153)
-    (:dark-purple 	51 0 51)
-    ;; Colours not defined in TCOD.
-    (:slate-grey 	#x80 #x80 #x80)
-    (:umber 		#x80 #x40 0)
-    (:pink 		#xFF #x00 #xFF)
-    (:chocolate 	210 105 30)))
 
 ;; TCOD_keycode_t
 (defcenum keycode
@@ -551,8 +481,78 @@ as 3 separate return values."
 	(:FONT-LAYOUT-TCOD 8))
 
 
+(defcenum rng-algorithm
+	:RNG-MT
+	:RNG-CMWC)
+
+
 ;; TCOD_console_t
 (defctype console :pointer)
+
+
+
+;;;; (@> "Colour") ============================================================
+
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun compose-colour (r g b)
+    "Given three integer values R, G and B, representing the red, green and
+blue components of a colour, return a 3 byte integer whose value is #xRRGGBB."
+    (+ (ash r 16) (ash g 8) b))
+  (defun compose-color (r g b) (compose-colour r g b)))
+
+
+(defun decompose-colour (num)
+  "Given a colournum #xRRGGBB, return R, G and B integer values
+as 3 separate return values."
+  (values
+	 (ash (logand num #xff0000) -16)
+	 (ash (logand num #x00ff00) -8)
+	 (logand num #x0000ff)))
+(defun decompose-color (num) (decompose-colour num))
+
+
+(defun invert-colour (num)
+  (multiple-value-bind (r g b) (decompose-colour num)
+    (compose-colour (- 255 r) (- 255 g) (- 255 b))))
+(defun invert-color (num) (invert-colour num))
+
+
+(defvar *colour-table* nil)
+(defvar *initial-colours*
+  `((:true-black	#x00 #x00 #x00)
+    (:true-pink		#xFF #x00 #xFF)
+    (:true-white	#xFF #xFF #xFF)
+    (:true-red		#xFF #x00 #x00)
+    (:true-green	#x00 #xFF #x00)
+    (:true-blue		#x00 #x00 #xFF)
+    (:black		#x00 #x00 #x00)
+    (:dark-grey 	96 96 96)
+    (:grey 		196 196 196)
+    (:white 		255 255 255)
+    (:blue		13 103 196)
+    (:dark-blue 	40 40 128)
+    (:light-blue 	120 120 255)
+    (:dark-red 		128 0 0)
+    (:light-red 	255 100 50)
+    (:dark-brown 	32 16 0)
+    (:light-yellow 	255 255 150)
+    (:yellow 		255 255 0)
+    (:dark-yellow 	164 164 0)
+    (:green 		0 220 0)
+    (:cyan		86 163 205)
+    (:orange 		255 150 0)
+    (:red 		255 0 0)
+    (:silver 		203 203 203)
+    (:gold 		255 255 102)
+    (:purple 		204 51 153)
+    (:dark-purple 	51 0 51)
+    ;; Colours not defined in TCOD.
+    (:slate-grey 	#x80 #x80 #x80)
+    (:umber 		#x80 #x40 0)
+    (:pink 		#xFF #x00 #xFF)
+    (:chocolate 	210 105 30)))
+
 
 ;;#define TCOD_BKGND_ALPHA(alpha) 
 ;;((TCOD_bkgnd_flag_t)(TCOD_BKGND_ALPH|(((uint8)(alpha*255))<<8)))
@@ -671,6 +671,10 @@ value (#xRRGGBB)."
 
 (defun colour-get-hsv (colour) (color-get-hsv colour))
 
+
+;;;; (@> "Console") ===========================================================
+
+
 (defcfun ("TCOD_console_credits" console-credits) :void)
 
 (defcfun ("TCOD_console_credits_render" console-credits-render) :boolean
@@ -740,6 +744,11 @@ or :FONT-LAYOUT-TCOD."
 	(con console))
 
 
+;; New in 1.5.0rc1
+(defcfun ("TCOD_console_set_dirty" console-set-dirty) :void
+  (dx :int) (dy :int) (dw :int) (dh :int))
+
+
 ;;TCODLIB_API void TCOD_console_set_back(TCOD_console_t con,int x, int y,
 ;;                                       TCOD_color_t col,
 ;;                                       TCOD_bkgnd_flag_t flag);
@@ -775,7 +784,17 @@ or :FONT-LAYOUT-TCOD."
 (defun console-set-char (con x y ch)
   ;; Assertion in libtcod
   (assert (legal-console-coordinates? con x y))
+  (when (characterp ch)
+    (setf ch (char-code ch)))
   (%console-set-char con x y ch))
+
+
+(defun console-fill-char (con ch fx fy fw fh)
+  "Fill a rectangular area with the character CH."
+  (loop for x from fx below (+ fx fw) do
+       (loop for y from fy below (+ fy fh) do
+            (when (legal-console-coordinates? con x y)
+            (console-set-char con x y ch)))))
 
 
 ;;TCODLIB_API void TCOD_console_put_char(TCOD_console_t con,int x, int y,
@@ -938,8 +957,7 @@ or :FONT-LAYOUT-TCOD."
 
 
 (defun legal-console-coordinates? (con x y)
-  (and (not (null-pointer-p con))
-       (< x (console-get-width con))
+  (and (< x (console-get-width con))
        (< y (console-get-height con))))
 
 
@@ -1009,11 +1027,6 @@ or :FONT-LAYOUT-TCOD."
 (defcfun ("TCOD_console_check_for_keypress_wrapper"
 	  %console-check-for-keypress) :boolean
 	(keyptr key-press) (flags key-state))
-
-
-(defun get-bit (n pos)
-  "POS = 1 refers to the 1's bit"
-  (/= 0 (logand n (expt 2 (1- pos)))))
 
 
 (defun key->keypress (keyptr)
@@ -1144,6 +1157,10 @@ or :FONT-LAYOUT-TCOD."
   (values (mem-ref *internal-width-ptr* :int)
 	  (mem-ref *internal-height-ptr* :int)))
 
+
+;;;; (@> "Random") ============================================================
+
+
 ;;; mersenne.h
 
 ;; TCOD_random_t
@@ -1151,7 +1168,13 @@ or :FONT-LAYOUT-TCOD."
 
 ;;TCODLIB_API TCOD_random_t TCOD_random_get_instance();
 ;;TCODLIB_API TCOD_random_t TCOD_random_new();
-(defcfun ("TCOD_random_new" random-new) randomptr)
+(defcfun ("TCOD_random_new" random-new) randomptr
+  (algorithm rng-algorithm))
+(defcfun ("TCOD_random_new_from_seed" random-new-from-seed) randomptr
+  (algorithm rng-algorithm) (seed :uint32))
+(defcfun ("TCOD_random_get_instance" random-get-instance) randomptr)
+(defcfun ("TCOD_random_delete" random-delete) :void
+  (rng randomptr))
 
 ;;TCODLIB_API TCOD_random_t TCOD_random_new_from_seed(uint32 seed);
 ;;TCODLIB_API int TCOD_random_get_int(TCOD_random_t mersenne, int min, int max);
@@ -1166,6 +1189,10 @@ or :FONT-LAYOUT-TCOD."
 ;;TCODLIB_API int TCOD_random_get_int_from_byte_array(int min, int max,
 ;;   const char *data,int len);
 ;;TCODLIB_API void TCOD_random_delete(TCOD_random_t mersenne);
+
+
+;;;; (@> "Mouse") =============================================================
+
 
 ;;; mouse.h
 
@@ -1238,6 +1265,10 @@ or :FONT-LAYOUT-TCOD."
 ;;TCODLIB_API void TCOD_mouse_move(int x, int y);
 (defcfun ("TCOD_mouse_move" mouse-move) :void
   (x :int) (y :int))
+
+
+
+;;;; (@> "Image") =============================================================
 
 
 ;;; image.h
