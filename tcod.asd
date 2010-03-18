@@ -10,4 +10,4 @@
     :author "moriarty4@gmail.com"
     :components
     ((:file "tcod") (:file "tcod-colours"))
-    :depends-on ("cffi"))
+    :depends-on ("cffi" "defstar"))
