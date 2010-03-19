@@ -25,6 +25,7 @@
    #:start-colours
    #:start-colors
    #:colour
+   #:color
    #:compose-colour
    #:compose-color
    #:decompose-colour
@@ -35,6 +36,9 @@
    #:color->grayscale
    #:colour-set-hsv
    #:colour-get-hsv
+   #:colour-get-hue
+   #:colour-get-saturation
+   #:colour-get-value
    #:colour-equals?
    #:colour-add
    #:colour-multiply
@@ -52,6 +56,8 @@
    #:color-multiply-scalar
    #:color-lerp
    #:make-color
+   #:background-alpha
+   #:background-add-alpha
    ;; [[Console]] ==========================================================
    #:console-wait-for-keypress
    #:console-check-for-keypress
@@ -72,9 +78,13 @@
    #:console-print-left
    #:console-print-right
    #:console-print-centre
+   #:console-print-center
    #:console-print-left-rect
    #:console-print-right-rect
    #:console-print-centre-rect
+   #:console-print-center-rect
+   #:console-hline
+   #:console-vline
    #:console-print-frame
    #:console-print-double-frame
    #:console-map-ascii-code-to-font
@@ -170,14 +180,18 @@
    #:mouse-get-mbutton-pressed
    #:mouse-get-rbutton-pressed
    ;; [[Image]] ===============================================================
+   #:image-new
    #:image-load
    #:image-save
    #:image-from-console
    #:image-clear
    #:image-put-pixel
    #:image-blit
+   #:image-blit-rect
    #:image-set-key-color
    #:image-set-key-colour
+   #:image-get-pixel
+   #:image-get-mipmap-pixel
    ;; [[Random]] ==============================================================
    #:random-new
    #:random-get-instance
@@ -254,7 +268,7 @@
    #:dijkstra-get
    #:dijkstra-is-empty?
    #:dijkstra-path-walk
-   ;; [[system layer]] ========================================================
+   ;; [[System]] ==============================================================
    #:sys-save-screenshot
    #:sys-sleep-milli
    #:sys-set-fps
@@ -281,32 +295,39 @@ CL-TCOD consists of the following files:
    and generating tcod-colours.lisp
 5. =parse-rgb.asd=, ASDF system definition file for =parse-rgb.lisp=
 
-CL-TCOD has been tested with SBCL 1.0.32 on Linux, and Clozure 1.4 on Linux
-and Windows XP.
+CL-TCOD has been tested with SBCL 1.0.36 on Linux and Windows, Clozure 1.5
+on Linux and Windows, and CLISP on Windows.
 
 **Note** that it has not been used on a Mac; if you do this you may need to
-tell CFFI what the name of the compiled libtcod library under MacOS is. To do
-this, open tcod.lisp in an editor, find the ='(define-foreign-library...'=
-clause, uncomment the ='(:macintosh...)'= line and change the string on that line
-to the name of the libtcod library file.
+tell CFFI the name of the compiled libtcod library under MacOS. To do this,
+open =tcod.lisp= in an editor, find the ='(define-foreign-library...'= clause,
+uncomment the ='(:macintosh...)'= line and change the string on that line to
+the name of the libtcod library file.
 
 * License
                                                
 The CL-TCOD package is placed in the Public Domain by its author.
+
+* Dependencies
+
+=CL-TCOD= depends on the following libraries:
+1. ASDF: [[http://common-lisp.net/project/asdf/]]
+2. DEFSTAR: [[http://bitbucket.org/eeeickythump/defstar/]]
+3. CFFI: [[http://common-lisp.net/project/cffi/]]
 
 * Hints on installation
 
 You need to know your way around your chosen common lisp and how to install and
 load lisp libraries before proceeding. You also need to have a version of
 libtcod newer than 1.4.1rc2, which is the first version that includes the
-'wrappers.c' and 'wrappers.h' source files that allow CL-TCOD to interface with
-libtcod.
+='wrappers.c'= and ='wrappers.h'= source files that allow CL-TCOD to interface
+with libtcod.
 
 1. Ensure you have a working common lisp installation. 
 2. Ensure the ASDF lisp library is installed.
-3. If CFFI is not installed (see above), download and install it somewhere ASDF
-   can find it. CFFI requires several third-party lisp libraries -- see the CFFI
-   documentation for more details.
+3. If CFFI or DEFSTAR are not installed, download and install them somewhere ASDF
+   can find them. CFFI requires several third-party lisp libraries -- see the
+   CFFI documentation for more details.
 4. Put the CL-TCOD files in a directory where ASDF can find them.
 5. Make sure libtcod is installed and compiled. Make sure the libtcod
    dynamically linked library (=.DLL= or =.SO= file) is somewhere your lisp system
@@ -345,8 +366,8 @@ libtcod.
 
 ** Naming conventions
 
-The C function =TCOD_foobar= corresponds to the lisp function =foobar=, which is in
-the =tcod= package (and so requires a prefix of =tcod:= to access in most
+The C function =TCOD_foobar= corresponds to the lisp function =foobar=, which
+is in the =tcod= package (and so requires a prefix of =tcod:= to access in most
 situations). Underscores become hyphens. So:
 
 :  TCOD_foobar_function(a, b)     <===>    (tcod:foobar-function a b)
@@ -369,8 +390,9 @@ names all begin with =':'=. THey are named according to the following pattern:
 :  TCOD_KEY_PRESSED              <===>  :key-pressed
 :  CENTER                        <===>  :center
 
-In general, all functions exist in both U.S. and non-U.S. spellings, This is
-mainly relevant to those functions with colour/color in their name.
+In general, most functions exist in both U.S. and non-U.S. spellings, This is
+mainly relevant to those functions with colour/color or centre/center in their
+names.
 
 ** Colournums
 
@@ -494,11 +516,11 @@ about anything you can imagine. It is mostly written in a dialect of lisp, and
 this is also its extension language. When combined with SLIME, a plugin (mode)
 that allows it to communicate directly with a running common lisp
 compiler/interpreter, Emacs is not only the best IDE for common lisp, but
-one of the best and most advanced IDEs for any programming language, period.
+one of the best and most advanced IDEs available for any programming language.
 
-The downside is that because Emacs + SLIME is so good, common lisp programmers
-have put very little effort into getting other popular programming editors/IDEs
-to support common lisp, at least beyond simple syntax highlighting. Emacs is an
+The downside: because Emacs + SLIME is so good, common lisp programmers have
+put very little effort into getting other popular programming editors/IDEs to
+support common lisp, at least beyond simple syntax highlighting. Emacs is an
 idiosyncratic program (it is about 34 years old) and despite good efforts to
 modernise/regularise its interface it still has a steeper learning curve than
 many other IDEs, especially when you are also struggling to set up SLIME and
@@ -513,7 +535,7 @@ SLIME.
 
 ** Commercial Common Lisp implementations
 
-These are both high quality but painfully expensive. Luckily they have
+These are both high quality, but painfully expensive. Luckily they have
 'limited' versions that can be downloaded for free, and which I recommend you
 use when beginning to learn common lisp.
 
@@ -544,7 +566,15 @@ Help & advice with lisp:
 
 (in-package :tcod)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3)))
+
+;;; Comment this out if you want cl-tcod to be 'fast' rather than 'safe and
+;;; maximally debuggable'
+(eval-when (:compile-toplevel :load-toplevel :execute)
+ (pushnew :tcod-debug *features*))
+
+
+#+tcod-debug (declaim (optimize (speed 0) (safety 3) (debug 3)))
+#-tcod-debug (declaim (optimize (speed 3) (safety 1) (debug 0)))
 
 
 ;;; CFFI 0.10.0 started using Babel to "encode" strings. This breaks extended
@@ -556,22 +586,30 @@ Help & advice with lisp:
 
 (setf cffi:*default-foreign-encoding* :iso-8859-1)
 
-;;; Force compiler to enforce type declarations for function arguments.
+;;; If debug mode is on, force compiler to explicitly enforce type declarations
+;;; for function arguments, raising an error when a type mismatch occurs.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf defstar:*check-argument-types-explicitly?* t))
+  (setf defstar:*check-argument-types-explicitly?*
+        #+tcod-debug t
+        #-tcod-debug nil))
 
-;;; uncomment this form if using pre 1.4.3b1 version of libtcod
-;;;(eval-when (:compile-toplevel :load-toplevel :execute)
-;;;  (pushnew :libtcod-old *features*))
+
+;;;; <<Library>> ==============================================================
+
  
  
 (define-foreign-library libtcod
-	(:unix "libtcod.so")
-	(:windows "libtcod-mingw.dll")
-	;; (:macintosh "name-of-libtcod-file-in-macos")
+	(:unix #+libtcod-debug "libtcod-debug.so"
+               #-libtcod-debug "libtcod.so")
+	(:windows #-libtcod-debug "libtcod-mingw.dll"
+                  #+libtcod-debug "libtcod-mingw-debug.dll")
+	;; (:macintosh "NAME-OF-LIBTCOD-LIBRARY-IN-MACOS")
 	(t (:default "libtcod")))
 
-(defvar *libtcod-loaded* nil)
+(defvar *libtcod-loaded* nil
+  "Global variable, set to non-nil once libtcod is loaded. This is to
+avoid crashes which occur in some CL implementations when you load
+an already-loaded foreign library.")
 
 (eval-when (:load-toplevel :execute)
 	(unless *libtcod-loaded*
@@ -582,16 +620,19 @@ Help & advice with lisp:
 ;;;; <<Utilities>> ============================================================
 
 
-(defun get-bit (n pos)
-  "POS = 1 refers to the 1's bit"
+(defun* (get-bit -> boolean) ((n integer) (pos uint8))
+  "Return the bit at position POS within the integer N (represented as
+a bitfield). POS = 1 refers to the 1's (rightmost) bit."
   (/= 0 (logand n (expt 2 (1- pos)))))
 
 
 
 (defvar *root* (null-pointer) "The root console.")
-(defparameter +NULL+ (null-pointer))
-(defconstant +NOISE-DEFAULT-HURST+ 0.5)
-(defconstant +NOISE-DEFAULT-LACUNARITY+ 2.0)
+(defparameter +NULL+ (null-pointer) "The null pointer.")
+(defconstant +NOISE-DEFAULT-HURST+ 0.5
+  "Default Hurst exponent for noise functions.")
+(defconstant +NOISE-DEFAULT-LACUNARITY+ 2.0
+  "Default lacunarity for noise functions.")
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -608,8 +649,12 @@ defined by [[deftype]]."
     t))
 
 
+;;; The following are some wrapper macros to ease the creation
+;;; of `type-safe' CFFI wrappers to C functions.
+
+
 (defmacro define-c-enum (name &rest vals)
-  "Defines both the CFFI 'enum' type, and a lisp type of the same
+  "Defines both the CFFI =enum= type, and a lisp type of the same
 name which is satisified by any of the values allowed by the enum type."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (progn
@@ -643,13 +688,13 @@ is satisfied by a list containing only bitfield keywords as members."
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun c-type->lisp-type (c-type)
+    "Given a CFFI foreign type, return an equivalent lisp type."
     (case c-type
       (:boolean 'boolean)
-      ((:int :unsigned-int)
-       `(unsigned-byte ,(* 8 (foreign-type-size :int))))
-      (:unsigned-char '(unsigned-byte 8))
-      (:uint8 '(unsigned-byte 8))
-      (:uint32 '(unsigned-byte 32))
+      ((:int :unsigned-int) 'uint)
+      (:unsigned-char 'uchar)
+      (:uint8 'uint8)
+      (:uint32 'uint32)
       (:float 'single-float)
       (:pointer (type-of (null-pointer)))
       (:string 'string)
@@ -657,21 +702,27 @@ is satisfied by a list containing only bitfield keywords as members."
       (otherwise
        (if (simple-type? c-type)
            c-type
-           (error "In C-TYPE->LISP-TYPE: unknown c type `~S'." c-type))))))
+           (error "In C-TYPE->LISP-TYPE: unrecognised c type `~S'." c-type))))))
 
 
 (defmacro define-c-function ((foreign-fn-name fn-name) return-type args
                              &body body)
-  "Format is similar to CFFI:DEFCFUN, except that the arguments are wrapped in a
-set of parentheses. ach argument specifier
-may contain a third term, which may be a symbol (naming a predicate function)
-or a form. The predicate or form is evaluated before the foreign function is
-actually called. If the result is nil, an error is raised."
+  "Format is similar to =CFFI:DEFCFUN=, except that:
+1. The function arguments are wrapped in a set of outer parentheses.
+2. Everything after this `arguments' term is considered to be the body
+   of the wrapper function. Within this body, the macro =(call-it)=
+   will call the actual C function. If =call-it= is called with no arguments,
+   it will pass all the arguments given to the wrapper function, to the
+   C function. Otherwise it will pass whatever arguments it is given, to
+   the C function (similar to =call-next-method=).
+3. If there is nothing after the function arguments, then the wrapper function
+   body will automatically consist of a single call to the underlying
+   C function."
   (let ((args-no-rest (remove '&rest args)))
     `(progn
        (defcfun (,foreign-fn-name ,(prepend-percent fn-name)) ,return-type
          ,@args)
-       #-clozure (declaim (inline ,fn-name))
+       (declaim (inline ,fn-name))
        (defun* (,fn-name -> ,(c-type->lisp-type return-type))
            ,(mapcar #'(lambda (clause)
                         `(,(first clause) ,(c-type->lisp-type (second clause))
@@ -685,16 +736,11 @@ actually called. If the result is nil, an error is raised."
                  ,@body)
               `(,(prepend-percent fn-name) ,@(mapcar #'car args-no-rest)))))))
 
-;; (define-c-function ("TCOD_console_init_root" console-init-root) :void
-;;     ((width :int) (height :int) (title :string) (fullscreen? :boolean))
-;;   (check-type width ucoord)
-;;   (check-type height ucoord)
-;;   (setf (gethash *root* *console-width-table*) width)
-;;   (setf (gethash *root* *console-height-table*) height)
-;;   (call-it))
 
 
 (defmacro define-c-type (name foreign-type)
+  "Define both a CFFI foreign type, and a corresponding lisp type of the same
+name."
   `(progn
      (defctype ,name ,foreign-type)
      (deftype ,name () ',(c-type->lisp-type foreign-type))))
@@ -704,26 +750,35 @@ actually called. If the result is nil, an error is raised."
 ;;;; <<Types>> ================================================================
 
 
+(deftype uint32 () `(unsigned-byte 32))
+(deftype uint24 () `(unsigned-byte 24))
+(deftype uint16 () `(unsigned-byte 16))
+(deftype uint8 () `(unsigned-byte 8))
+(deftype uint () `(unsigned-byte ,(* 8 (foreign-type-size :int))))
+(deftype uchar () `(unsigned-byte ,(* 8 (foreign-type-size :unsigned-char))))
+
 (deftype ucoord () `(integer 0 1000))
 
 
 (define-c-type colournum :unsigned-int)
 
 
-(defcstruct colour  ; TCOD_color_t
+;; TCOD_color_t
+;; This is seldom used -- colournums are used instead (see above).
+(defcstruct colour  
 	(r :uint8)
 	(g :uint8)
 	(b :uint8))
 
 
-;; TCOD_renderer_t
+;; TCOD_renderer_t (enum)
 (define-c-enum renderer
   :RENDERER-GLSL
   :RENDERER-OPENGL
   :RENDERER-SDL)
 
 
-;; TCOD_keycode_t
+;; TCOD_keycode_t (enum)
 (define-c-enum keycode
 	:NONE
 	:ESCAPE
@@ -794,13 +849,18 @@ actually called. If the result is nil, an error is raised."
 
 
 ;; TCOD_key_t
+;; This is no longer used -- key structs are converted to a bitfield by
+;; wrapper functions in libtcod.
 (defcstruct key-press
 	(vk keycode)     ; character if vk == TCODK_CHAR else 0
 	(c :unsigned-char)
 	(flags :uint8))  ; does this correspond to a key press or key
 					; release event ?
 
+
 (defstruct key
+  "The structure used by CL-TCOD to represent key-press events. Corresponds
+to the structure used by libtcod."
   (vk :none :type keyword)
   (c #\null :type character)
   (pressed nil :type boolean)
@@ -811,11 +871,11 @@ actually called. If the result is nil, an error is raised."
   (shift nil :type boolean))
 
 
-(defun make-simple-key (ch)
+(defun* (make-simple-key -> key) ((ch character))
   (make-key :vk :char :c ch))
 
 
-(defun same-keys? (key1 key2)
+(defun* (same-keys? -> boolean) ((key1 key) (key2 key))
   (and (key-p key1) (key-p key2)
        (eql (key-vk key1) (key-vk key2))
        (eql (key-c key1) (key-c key2))
@@ -824,7 +884,7 @@ actually called. If the result is nil, an error is raised."
 	    (or (key-lalt key2) (key-ralt key2)))
        (eql (or (key-lctrl key1) (key-rctrl key1))
 	    (or (key-lctrl key2) (key-rctrl key2)))))
-       
+
 
 
 (define-c-enum drawing-character
@@ -883,7 +943,7 @@ actually called. If the result is nil, an error is raised."
 	(:CHAR-SUBP-SW 232))
 
 
-;; TCOD_colctrl_t
+;; TCOD_colctrl_t (enum)
 (define-c-enum colctrl
 	(:COLCTRL-1 1)
 	:COLCTRL-2
@@ -895,7 +955,7 @@ actually called. If the result is nil, an error is raised."
 	:COLCTRL-BACK-RGB
 	:COLCTRL-STOP )
 
-;; TCOD_bkgnd_flag_t
+;; TCOD_bkgnd_flag_t (enum)
 (define-c-enum background-flag
 	:NONE
 	:SET
@@ -921,6 +981,7 @@ actually called. If the result is nil, an error is raised."
 (define-c-bitfield key-state
 	(:KEY-PRESSED 1)
 	(:KEY-RELEASED 2))
+
 
 (define-c-bitfield custom-font-flags
 	(:FONT-LAYOUT-ASCII-IN-COL 1)
@@ -959,8 +1020,7 @@ actually called. If the result is nil, an error is raised."
 (define-c-type randomptr :pointer)
 
 
-;;; mouse.h
-
+;; TCOD_mouse_t
 (defcstruct mouse-state
 	(x :int)	
 	(y :int)	
@@ -978,20 +1038,21 @@ actually called. If the result is nil, an error is raised."
         (mbutton-pressed :boolean))
 
 (defstruct mouse
-	(x 0 :type integer)	;; absolute position
-	(y 0 :type integer)	
-	(dx 0 :type integer)	;; movement since last update in pixels
-	(dy 0 :type integer)
-	(cx 0 :type integer)	;; cell coordinates in the root console 
-	(cy 0 :type integer)
-	(dcx 0 :type integer)	;; movement since last update in console cells
-	(dcy 0 :type integer)
-	(lbutton nil :type boolean)	;; left button status
-	(rbutton nil :type boolean)	;; right button status
-	(mbutton nil :type boolean) ;; middle button status
-	(lbutton-pressed nil :type boolean)	;; left button pressed event
-	(rbutton-pressed nil :type boolean)	;; right button pressed event
-	(mbutton-pressed nil :type boolean))	;; middle button pressed event
+  "Structure used by CL-TCOD to represent mouse status."
+  (x 0 :type uint16) ;; absolute position
+  (y 0 :type uint16)	
+  (dx 0 :type uint16) ;; movement since last update in pixels
+  (dy 0 :type uint16)
+  (cx 0 :type uint16) ;; cell coordinates in the root console 
+  (cy 0 :type uint16)
+  (dcx 0 :type uint16)	;; movement since last update in console cells
+  (dcy 0 :type uint16)
+  (lbutton nil :type boolean)                ;; left button status
+  (rbutton nil :type boolean)                ;; right button status
+  (mbutton nil :type boolean)                ;; middle button status
+  (lbutton-pressed nil :type boolean)        ;; left button pressed event
+  (rbutton-pressed nil :type boolean)        ;; right button pressed event
+  (mbutton-pressed nil :type boolean))       ;; middle button pressed event
 
 
 ;; TCOD_image_t
@@ -1012,26 +1073,29 @@ actually called. If the result is nil, an error is raised."
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun compose-colour (r g b)
+  (defun* (compose-colour -> uint32) ((r uint8) (g uint8) (b uint8))
     "Given three integer values R, G and B, representing the red, green and
 blue components of a colour, return a 3 byte integer whose value is #xRRGGBB."
     (+ (ash r 16) (ash g 8) b))
+  (declaim (inline compose-color))
   (defun compose-color (r g b) (compose-colour r g b)))
 
 
-(defun decompose-colour (num)
+(defun* (decompose-colour -> (values uint8 uint8 uint8)) ((num colournum))
   "Given a colournum #xRRGGBB, return R, G and B integer values
 as 3 separate return values."
   (values
 	 (ash (logand num #xff0000) -16)
 	 (ash (logand num #x00ff00) -8)
 	 (logand num #x0000ff)))
+(declaim (inline decompose-color))
 (defun decompose-color (num) (decompose-colour num))
 
 
-(defun invert-colour (num)
+(defun* (invert-colour -> colournum) ((num colournum))
   (multiple-value-bind (r g b) (decompose-colour num)
     (compose-colour (- 255 r) (- 255 g) (- 255 b))))
+(declaim (inline invert-color))
 (defun invert-color (num) (invert-colour num))
 
 
@@ -1064,7 +1128,7 @@ as 3 separate return values."
     (:gold 		255 255 102)
     (:purple 		204 51 153)
     (:dark-purple 	51 0 51)
-    ;; Colours not defined in TCOD.
+    ;; Some colours not defined in TCOD.
     (:slate-grey 	#x80 #x80 #x80)
     (:umber 		#x80 #x40 0)
     (:pink 		#xFF #x00 #xFF)
@@ -1072,7 +1136,7 @@ as 3 separate return values."
 
 
 ;;#define TCOD_BKGND_ALPHA(alpha) 
-;;((TCOD_bkgnd_flag_t)(TCOD_BKGND_ALPH|(((uint8)(alpha*255))<<8)))
+;;    ((TCOD_bkgnd_flag_t)(TCOD_BKGND_ALPH|(((uint8)(alpha*255))<<8)))
 (defun background-alpha (alpha)
   (foreign-enum-keyword 'background-flag
 			(logior (foreign-enum-value 'background-flag :alph)
@@ -1080,7 +1144,7 @@ as 3 separate return values."
 
 ;;
 ;;#define TCOD_BKGND_ADDALPHA(alpha) 
-;;((TCOD_bkgnd_flag_t)(TCOD_BKGND_ADDA|(((uint8)(alpha*255))<<8)))
+;;    ((TCOD_bkgnd_flag_t)(TCOD_BKGND_ADDA|(((uint8)(alpha*255))<<8)))
 (defun background-add-alpha (alpha)
   (foreign-enum-keyword 'background-flag
 			(logior (foreign-enum-value 'background-flag :adda)
@@ -1110,7 +1174,7 @@ as 3 separate return values."
 (defun color->grayscale (col) (colour->grayscale col))
   
 
-(defun colour (keywd)
+(defun* (colour -> colournum) ((keywd (or colournum symbol)))
   "Given a colour keyword such as :GREY, return its corresponding RGB
 value (#xRRGGBB)."
   (cond
@@ -1120,6 +1184,7 @@ value (#xRRGGBB)."
      (unless *colour-table*
        (start-colours))
      (gethash keywd *colour-table*))))
+(declaim (inline color))
 (defun color (keywd) (colour keywd))
 
 
@@ -1129,98 +1194,87 @@ value (#xRRGGBB)."
 
 
 ;; TCODLIB_API bool TCOD_color_equals (TCOD_color_t c1, TCOD_color_t c2); 
-(define-c-function ("TCOD_color_equals_wrapper" color-equals?) :boolean
+(define-c-function ("TCOD_color_equals_wrapper" colour-equals?) :boolean
 	((c1 colournum) (c2 colournum)))
-(defun colour-equals? (c1 c2)
-  (color-equals? c1 c2))
+(declaim (inline color-equals?))
+(defun color-equals? (c1 c2)
+  (colour-equals? c1 c2))
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_color_add (TCOD_color_t c1, TCOD_color_t c2);
-(define-c-function ("TCOD_color_add_wrapper" color-add) colournum
+(define-c-function ("TCOD_color_add_wrapper" colour-add) colournum
 	((c1 colournum) (c2 colournum)))
+(declaim (inline color-add))
+(defun color-add (c1 c2)
+  (colour-add c1 c2))
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_color_multiply (TCOD_color_t c1,
 ;; TCOD_color_t c2); 
-(define-c-function ("TCOD_color_multiply_wrapper" color-multiply) colournum
+(define-c-function ("TCOD_color_multiply_wrapper" colour-multiply) colournum
 	((c1 colournum) (c2 colournum)))
-(defun colour-multiply (c1 c2)
-  (color-multiply c1 c2))
+(declaim (inline color-multiply))
+(defun color-multiply (c1 c2)
+  (colour-multiply c1 c2))
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_color_multiply_scalar (TCOD_color_t c1,
 ;; float value);
-(define-c-function ("TCOD_color_multiply_scalar_wrapper" color-multiply-scalar) colournum
-	((c1 colournum) (value :float)))
-(defun colour-multiply-scalar (c1 value)
-  (color-multiply-scalar c1 value))
+(define-c-function ("TCOD_color_multiply_scalar_wrapper" colour-multiply-scalar)
+    colournum
+    ((c1 colournum) (value :float)))
+(declaim (inline color-multiply-scalar))
+(defun color-multiply-scalar (c1 value)
+  (colour-multiply-scalar c1 value))
 
 
 ;; TCODLIB_API TCOD_color_t TCOD_color_lerp(TCOD_color_t c1, TCOD_color_t c2,
 ;; float coef);
-(define-c-function ("TCOD_color_lerp_wrapper" color-lerp) colournum
+(define-c-function ("TCOD_color_lerp_wrapper" colour-lerp) colournum
 	((c1 colournum) (c2 colournum) (coef :float)))
-(defun colour-lerp (c1 c2 coef)
-  (color-lerp c1 c2 coef))
+(declaim (inline color-lerp))
+(defun color-lerp (c1 c2 coef)
+  (colour-lerp c1 c2 coef))
 
 
 ;; TCODLIB_API void TCOD_color_set_HSV(TCOD_color_t *c,float h, float s,
 ;; float v);
-(define-c-function ("TCOD_color_set_HSV" color-set-hsv) :void
+(define-c-function ("TCOD_color_set_HSV" colour-set-hsv) :void
 	((con :pointer) (hue :float) (sat :float) (v :float)))
-(defun colour-set-hsv (con hue sat v)
-  (color-set-hsv con hue sat v))
+(declaim (inline color-set-hsv))
+(defun color-set-hsv (con hue sat v)
+  (colour-set-hsv con hue sat v))
 
 
-;; TCODLIB_API void TCOD_color_get_HSV(TCOD_color_t c,float * h, float * s,
-;; float * v);
-
-;; (defvar *internal-color-hue-ptr* (foreign-alloc :int))
-;; (defvar *internal-color-saturation-ptr* (foreign-alloc :int))
-;; (defvar *internal-color-value-ptr* (foreign-alloc :int))
-
-;; (defcfun ("TCOD_color_get_HSV_wrapper" %color-get-hsv) :void
-;;     (c colournum) (h :pointer) (s :pointer) (v :pointer))
-
-;; (defun* (color-get-hsv -> list) ((color colournum))
-;;   (with-foreign-object (hue :int)
-;;     (with-foreign-object (sat :int)
-;;       (with-foreign-object (val :int)
-;;         (%color-get-hsv color hue sat val)
-;;         (list (mem-ref hue :int)
-;;               (mem-ref sat :int)
-;;               (mem-ref val :int))))))
-
-
-(define-c-function ("TCOD_color_get_hue" color-get-hue) :int
+(define-c-function ("TCOD_color_get_hue" colour-get-hue) :int
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_saturation" color-get-saturation) :int
+(define-c-function ("TCOD_color_get_saturation" colour-get-saturation) :int
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_value" color-get-value) :int
+(define-c-function ("TCOD_color_get_value" colour-get-value) :int
     ((c colournum)))
 
 
-(defun* (color-get-hsv -> list) ((c colournum))
-  (list (color-get-hue c)
-        (color-get-saturation c)
-        (color-get-value c)))
+(defun* (colour-get-hsv -> list) ((c colournum))
+  (list (colour-get-hue c)
+        (colour-get-saturation c)
+        (colour-get-value c)))
 
-(declaim (inline colour-get-hsv colour-get-hue colour-get-saturation
-                 colour-get-value))
+(declaim (inline color-get-hsv color-get-hue color-get-saturation
+                 color-get-value))
 
-(defun colour-get-hsv (colour)
-  (color-get-hsv colour))
+(defun color-get-hsv (colour)
+  (colour-get-hsv colour))
 
-(defun colour-get-hue (colour)
-  (color-get-hue colour))
+(defun color-get-hue (colour)
+  (colour-get-hue colour))
 
-(defun colour-get-saturation (colour)
-  (color-get-hue colour))
+(defun color-get-saturation (colour)
+  (colour-get-hue colour))
 
-(defun colour-get-value (colour)
-  (color-get-hue colour))
+(defun color-get-value (colour)
+  (colour-get-hue colour))
 
 
 
@@ -1236,6 +1290,7 @@ value (#xRRGGBB)."
 ;;        (< y (console-get-height con))))
 
 (defmacro legal-console-coordinates? (con x y)
+  "Are the relative coordinates X,Y within the bounds of console CON?"
   `(and (< ,x (console-get-width ,con))
         (< ,y (console-get-height ,con))))
 
@@ -1261,29 +1316,14 @@ value (#xRRGGBB)."
   (setf (gethash *root* *console-height-table*) height)
   (call-it))
 
-;; (define-c-function ("TCOD_console_init_root" console-init-root) :void
-;;     ((width :int) (height :int) (title :string) (fullscreen? :boolean))
-;;   (check-type width ucoord)
-;;   (check-type height ucoord)
-;;   (setf (gethash *root* *console-width-table*) width)
-;;   (setf (gethash *root* *console-height-table*) height)
-;;   (call-it))
-
-
-;; (defun* console-init-root ((w fixnum) (h fixnum) (title string)
-;;                            (fullscreen? boolean))
-;;   (setf (gethash *root* *console-width-table*) w)
-;;   (setf (gethash *root* *console-height-table*) h)
-;;   (%console-init-root w h title fullscreen?))
-
-                           
+                          
 ;;TCODLIB_API void TCOD_console_set_custom_font(const char *fontFile,
 ;;                        int char_width, int char_height, int nb_char_horiz,
 ;;                        int nb_char_vertic, bool chars_by_row,
 ;;                        TCOD_color_t key_color);
 (define-c-function ("TCOD_console_set_custom_font" console-set-custom-font) :void
-	((fontfile :string) (flags custom-font-flags)
-	(chars-horizontal :int) (chars-vertical :int))
+    ((fontfile :string) (flags custom-font-flags)
+     (chars-horizontal :int) (chars-vertical :int))
   (assert (probe-file fontfile))
   (check-type chars-horizontal (unsigned-byte 16))
   (check-type chars-vertical (unsigned-byte 16))
@@ -1307,14 +1347,6 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_console_map_string_to_font"
                     console-map-string-to-font) :void
     ((str :string) (fontchar-x :int) (fontchar-y :int)))
-
-;; (defun* console-set-custom-font ((fontfile string) flags (chars-horizontal fixnum)
-;;                                  (chars-vertical fixnum))
-;;   "FLAGS accepts a quoted list containing one or more of the symbols
-;; :FONT-LAYOUT-ASCII-IN-ROW, :FONT-LAYOUT-ASCII-IN-COL, :FONT-TYPE-GREYSCALE,
-;; or :FONT-LAYOUT-TCOD."
-;;   (assert (probe-file fontfile))
-;;   (%console-set-custom-font fontfile flags chars-horizontal chars-vertical))
 
 
 ;;TCODLIB_API void TCOD_console_set_window_title(const char *title);
@@ -1378,17 +1410,6 @@ value (#xRRGGBB)."
   (assert (legal-console-coordinates? con x y))
   (call-it con x y col flag))
 
-;; (defun* console-set-back ((con console) (x ucoord) (y ucoord)
-;;                           (col colournum) (flag background-flag))
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-set-back con x y col flag))
-
-
-;; (defun console-set-back (con x y col flag)
-;;   ;; Assertion in libtcod
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-set-back con x y col flag))
-
 
 ;;TCODLIB_API void TCOD_console_set_fore(TCOD_console_t con,int x, int y,
 ;;                                       TCOD_color_t col);
@@ -1396,18 +1417,6 @@ value (#xRRGGBB)."
     ((con console) (x :int) (y :int) (col colournum))
   (assert (legal-console-coordinates? con x y))
   (call-it con x y col))
-
-;; (defun* console-set-fore ((con console) (x ucoord) (y ucoord)
-;;                           (col colournum) (flag background-flag))
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-set-fore con x y col))
-
-
-;; (defun console-set-fore (con x y col)
-;;   ;; Assertion in libtcod
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-set-fore con x y col))
-
 
 
 ;;TCODLIB_API void TCOD_console_set_char(TCOD_console_t con,int x, int y,
@@ -1420,16 +1429,7 @@ value (#xRRGGBB)."
   (call-it con x y ch))
 
 
-;; (defun* console-set-char ((con console) (x ucoord) (y ucoord)
-;;                           (ch (or character fixnum)))
-;;   ;; Assertion in libtcod
-;;   (assert (legal-console-coordinates? con x y))
-;;   (when (characterp ch)
-;;     (setf ch (char-code ch)))
-;;   (%console-set-char con x y ch))
-
-
-(defun* (console-fill-char -> null)  ((con console) (ch (or character fixnum))
+(defun* (console-fill-char -> null)  ((con console) (ch (or character uchar))
                                       (fx ucoord) (fy ucoord)
                                       (fw ucoord) (fh ucoord))
   "Fill a rectangular area with the character CH."
@@ -1457,21 +1457,12 @@ value (#xRRGGBB)."
   (call-it))
 
 
-;; (defun* console-put-char-ex ((con console) (x fixnum) (y fixnum)
-;;                              (ch (or character fixnum))
-;;                              (fg colournum) (bg colournum))
-;;   (assert (and (not (null-pointer-p con))
-;;                (< x (console-get-width con))
-;;                (< y (console-get-height con))))
-;;   (%console-put-char-ex con x y ch fg bg))
-
-
 ;;TCODLIB_API void TCOD_console_print_left(TCOD_console_t con,int x, int y,
 ;;                                         TCOD_bkgnd_flag_t flag,
 ;;                                         const char *fmt, ...);
 
 ;; This has to have a separate lisp wrapper, as we need to be able
-;; to pass 'args' to lisp.
+;; to pass 'args...' to lisp.
 (defcfun ("TCOD_console_print_left" %console-print-left) :void
   (con console) (x :int) (y :int) (flag background-flag) (fmt :string)
   &rest)
@@ -1492,16 +1483,6 @@ value (#xRRGGBB)."
   (assert (legal-console-coordinates? con x y))
   (call-it))
 
-
-;; (defun* (console-print-return-string -> string)
-;;     ((con console) (x fixnum) (y fixnum)
-;;      (rw fixnum) (rh fixnum)
-;;      (flag background-flag)
-;;      (align alignment)
-;;      (msg string) (can-split? boolean)
-;;      (count-only? boolean))
-;;   (%console-print-return-string con x y rw rh flag align msg
-;; 				can-split? count-only?))
 
 ;;TCODLIB_API void TCOD_console_print_right(TCOD_console_t con,int x, int y,
 ;; TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
@@ -1573,6 +1554,11 @@ value (#xRRGGBB)."
   (assert (legal-console-coordinates? con x y))
   (%console-print-centre-rect con x y w h flag
                               (apply #'format nil fmt args)))
+
+(declaim (inline console-print-center-rect))
+(defun console-print-center-rect (con x y w h flag fmt &rest args)
+  (apply #'console-print-centre-rect con x y w h flag fmt args))
+
 
 
 ;;TCODLIB_API void TCOD_console_rect(TCOD_console_t con,int x, int y, int w,
@@ -1708,12 +1694,6 @@ value (#xRRGGBB)."
   (call-it))
 
 
-;; (defun* (console-get-back -> colournum) ((con console) (x fixnum) (y fixnum))
-;;   ;; Assertion in libtcod
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-get-back con x y))
-
-
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_fore(TCOD_console_t con,
 ;;                                               int x, int y);
 (define-c-function ("TCOD_console_get_fore_wrapper" console-get-fore) colournum
@@ -1721,24 +1701,12 @@ value (#xRRGGBB)."
   (assert (legal-console-coordinates? con x y))
   (call-it))
 
-
-;; (defun* (console-get-fore -> colournum) ((con console) (x fixnum) (y fixnum))
-;;   ;; Assertion in libtcod
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-get-fore con x y))
-
   
 ;;TCODLIB_API int TCOD_console_get_char(TCOD_console_t con,int x, int y);
 (define-c-function ("TCOD_console_get_char" console-get-char) :int
   ((con console) (x :int) (y :int))
   (assert (legal-console-coordinates? con x y))
   (call-it))
-
-
-;; (defun* (console-get-char -> fixnum) ((con console) (x fixnum) (y fixnum))
-;;   ;; Assertion in libtcod
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-get-char con x y))
 
 
 ;;TCODLIB_API void TCOD_console_set_fade(uint8 val, TCOD_color_t fade);
@@ -1763,23 +1731,132 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_console_flush" console-flush) :void
     ())
 
-;; (sys-flush t) forces an 'update' of the system timer, FPS, etc.
-;; If render is true, also forces an update of the root console.
-;; However, seems not to be an external symbol in latest libtcod (1.5.0)
-;; #-libtcod-old
-;; (define-c-function ("TCOD_sys_flush" sys-flush) :void
-;; 	(render :boolean))
 
 ;;TCODLIB_API void TCOD_console_set_color_control(TCOD_colctrl_t con,
 ;;     TCOD_color_t fore, TCOD_color_t back);
 ;; This is to do with "colour control" strings
 (define-c-function ("TCOD_console_set_color_control_wrapper"
-	  console-set-color-control) :void
+	  console-set-colour-control) :void
   ((control-num colctrl) (fore colournum) (back colournum)))
 
-(declaim (inline console-set-colour-control))
-(defun console-set-colour-control (control-num fore back)
-  (console-set-color-control control-num fore back))
+(declaim (inline console-set-color-control))
+(defun console-set-color-control (control-num fore back)
+  (console-set-colour-control control-num fore back))
+
+
+
+;;TCODLIB_API TCOD_console_t TCOD_console_new(int w, int h);
+(define-c-function ("TCOD_console_new" console-new) console
+    ((width :int) (height :int))
+  (check-type width ucoord)
+  (check-type height ucoord)
+  (let ((newcon (call-it width height)))
+    (setf (gethash newcon *console-width-table*) width)
+    (setf (gethash newcon *console-height-table*) height)
+    newcon))
+
+
+;; (defun* (console-new -> console) ((width ucoord) (height ucoord))
+;;   (let ((newcon (%console-new width height)))
+;;     (setf (gethash newcon *console-width-table*) width)
+;;     (setf (gethash newcon *console-height-table*) height)
+;;     newcon))
+
+
+;;TCODLIB_API int TCOD_console_get_width(TCOD_console_t con);
+(define-c-function ("TCOD_console_get_width" console-get-width) :int
+  ((con console))
+  (or (gethash con *console-width-table*)
+      (call-it)))
+
+
+;; (defun* (console-get-width -> ucoord) ((con console))
+;;   (or (gethash con *console-width-table*)
+;;       (%console-get-width con)))
+
+
+;;TCODLIB_API int TCOD_console_get_height(TCOD_console_t con);
+(define-c-function ("TCOD_console_get_height" console-get-height) :int
+  ((con console))
+  (or (gethash con *console-height-table*)
+      (call-it)))
+
+
+;; (defun* (console-get-height -> ucoord) ((con console))
+;;   (or (gethash con *console-height-table*)
+;;       (%console-get-height con)))
+
+
+;;TCODLIB_API void TCOD_console_blit(TCOD_console_t src,int xSrc, int ySrc,
+;; int wSrc, int hSrc, TCOD_console_t dst, int xDst, int yDst, int fade);
+(define-c-function ("TCOD_console_blit" console-blit) :void
+    ((src console)
+     (xsrc :int) (ysrc :int)
+     (wsrc :int) (hsrc :int)
+     (dest console)
+     (xdest :int) (ydest :int)
+     (foreground-alpha :float) (background-alpha :float))
+  (check-type xsrc ucoord)
+  (check-type ysrc ucoord)
+  (check-type wsrc ucoord)
+  (check-type hsrc ucoord)
+  (check-type xdest ucoord)
+  (check-type ydest ucoord)
+  (check-type foreground-alpha (real 0 1.0))
+  (check-type background-alpha (real 0 1.0))
+  ;; Blitting a console to a position that lies completely outside the
+  ;; destination console's bounds will do nothing, rather than causing
+  ;; an error.
+  (when (legal-console-coordinates? dest xdest ydest)
+    ;; TCOD_console_blit unceremoniously crashes libtcod if this assertion is
+    ;; not true when it is called. We therefore check the assertion here first,
+    ;; so we have access to lisp debugging facilities if the conditions are not
+    ;; met.
+    (assert (and (plusp wsrc) (plusp hsrc)
+                 (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
+    (call-it src xsrc ysrc wsrc hsrc dest xdest ydest
+             foreground-alpha background-alpha)))
+    
+  
+
+
+;; (defun* console-blit ((src console)
+;;                       (xsrc fixnum) (ysrc fixnum) (wsrc fixnum) (hsrc fixnum)
+;;                       (dest console)
+;;                       (xdest fixnum) (ydest fixnum)
+;;                       (foreground-alpha float) (background-alpha float))
+;;   (check-type xsrc (integer 0))
+;;   (check-type ysrc (integer 0))
+;;   (check-type wsrc (integer 0))
+;;   (check-type hsrc (integer 0))
+;;   (check-type xdest (integer 0))
+;;   (check-type ydest (integer 0))
+;;   (check-type foreground-alpha (real 0 1.0))
+;;   (check-type background-alpha (real 0 1.0))
+;;   ;; Blitting a console to a position that lies completely outside the
+;;   ;; destination console's bounds will do nothing, rather than causing
+;;   ;; an error.
+;;   (unless (or (>= xdest (console-get-width dest))
+;;               (>= ydest (console-get-height dest)))
+;;     ;; TCOD_console_blit unceremoniously crashes libtcod if this assertion
+;;     ;; is not true when it is called. We therefore check the assertion here
+;;     ;; first, so we have access to debugging facilities if the conditions
+;;     ;; are not met.
+;;     (assert (and (plusp wsrc) (plusp hsrc)
+;;                  (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
+;;     (%console-blit src xsrc ysrc wsrc hsrc dest xdest ydest
+;;                    foreground-alpha background-alpha)))
+
+
+;;TCODLIB_API void TCOD_console_delete(TCOD_console_t console);
+(define-c-function ("TCOD_console_delete" console-delete) :void
+    ((con console)))
+
+
+;; void TCOD_console_set_key_color(TCOD_console_t con,TCOD_color_t col);
+;; (define-c-function ("TCOD_console_set_key_color" console-set-key-color) :void
+;;     ((con console)))
+
 
 
 ;;;; <<Keyboard input>> ========================================================
@@ -1873,120 +1950,9 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_console_is_key_pressed" is-key-pressed?) :boolean
   ((code keycode)))
 
-;;TCODLIB_API TCOD_console_t TCOD_console_new(int w, int h);
-(define-c-function ("TCOD_console_new" console-new) console
-    ((width :int) (height :int))
-  (check-type width ucoord)
-  (check-type height ucoord)
-  (let ((newcon (call-it width height)))
-    (setf (gethash newcon *console-width-table*) width)
-    (setf (gethash newcon *console-height-table*) height)
-    newcon))
 
+;;;; <<System>> ===============================================================
 
-;; (defun* (console-new -> console) ((width ucoord) (height ucoord))
-;;   (let ((newcon (%console-new width height)))
-;;     (setf (gethash newcon *console-width-table*) width)
-;;     (setf (gethash newcon *console-height-table*) height)
-;;     newcon))
-
-
-;;TCODLIB_API int TCOD_console_get_width(TCOD_console_t con);
-(define-c-function ("TCOD_console_get_width" console-get-width) :int
-  ((con console))
-  (or (gethash con *console-width-table*)
-      (call-it)))
-
-
-;; (defun* (console-get-width -> ucoord) ((con console))
-;;   (or (gethash con *console-width-table*)
-;;       (%console-get-width con)))
-
-
-;;TCODLIB_API int TCOD_console_get_height(TCOD_console_t con);
-(define-c-function ("TCOD_console_get_height" console-get-height) :int
-  ((con console))
-  (or (gethash con *console-height-table*)
-      (call-it)))
-
-
-;; (defun* (console-get-height -> ucoord) ((con console))
-;;   (or (gethash con *console-height-table*)
-;;       (%console-get-height con)))
-
-
-;;TCODLIB_API void TCOD_console_blit(TCOD_console_t src,int xSrc, int ySrc,
-;; int wSrc, int hSrc, TCOD_console_t dst, int xDst, int yDst, int fade);
-(define-c-function ("TCOD_console_blit" console-blit) :void
-    ((src console)
-     (xsrc :int) (ysrc :int)
-     (wsrc :int) (hsrc :int)
-     (dest console)
-     (xdest :int) (ydest :int)
-     (foreground-alpha :float) (background-alpha :float))
-  (check-type xsrc (integer 0))
-  (check-type ysrc (integer 0))
-  (check-type wsrc (integer 0))
-  (check-type hsrc (integer 0))
-  (check-type xdest (integer 0))
-  (check-type ydest (integer 0))
-  (check-type foreground-alpha (real 0 1.0))
-  (check-type background-alpha (real 0 1.0))
-  ;; Blitting a console to a position that lies completely outside the
-  ;; destination console's bounds will do nothing, rather than causing
-  ;; an error.
-  (when (legal-console-coordinates? dest xdest ydest)
-    ;; TCOD_console_blit unceremoniously crashes libtcod if this assertion is
-    ;; not true when it is called. We therefore check the assertion here first,
-    ;; so we have access to lisp debugging facilities if the conditions are not
-    ;; met.
-    (assert (and (plusp wsrc) (plusp hsrc)
-                 (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
-    (call-it src xsrc ysrc wsrc hsrc dest xdest ydest
-             foreground-alpha background-alpha)))
-    
-  
-
-
-;; (defun* console-blit ((src console)
-;;                       (xsrc fixnum) (ysrc fixnum) (wsrc fixnum) (hsrc fixnum)
-;;                       (dest console)
-;;                       (xdest fixnum) (ydest fixnum)
-;;                       (foreground-alpha float) (background-alpha float))
-;;   (check-type xsrc (integer 0))
-;;   (check-type ysrc (integer 0))
-;;   (check-type wsrc (integer 0))
-;;   (check-type hsrc (integer 0))
-;;   (check-type xdest (integer 0))
-;;   (check-type ydest (integer 0))
-;;   (check-type foreground-alpha (real 0 1.0))
-;;   (check-type background-alpha (real 0 1.0))
-;;   ;; Blitting a console to a position that lies completely outside the
-;;   ;; destination console's bounds will do nothing, rather than causing
-;;   ;; an error.
-;;   (unless (or (>= xdest (console-get-width dest))
-;;               (>= ydest (console-get-height dest)))
-;;     ;; TCOD_console_blit unceremoniously crashes libtcod if this assertion
-;;     ;; is not true when it is called. We therefore check the assertion here
-;;     ;; first, so we have access to debugging facilities if the conditions
-;;     ;; are not met.
-;;     (assert (and (plusp wsrc) (plusp hsrc)
-;;                  (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
-;;     (%console-blit src xsrc ysrc wsrc hsrc dest xdest ydest
-;;                    foreground-alpha background-alpha)))
-
-
-;;TCODLIB_API void TCOD_console_delete(TCOD_console_t console);
-(define-c-function ("TCOD_console_delete" console-delete) :void
-    ((con console)))
-
-
-;; void TCOD_console_set_key_color(TCOD_console_t con,TCOD_color_t col);
-;; (define-c-function ("TCOD_console_set_key_color" console-set-key-color) :void
-;;     ((con console)))
-
-
-;;; sys.h
 
 ;;TCODLIB_API uint32 TCOD_sys_elapsed_milli();
 ;;TCODLIB_API float TCOD_sys_elapsed_seconds();
@@ -2010,10 +1976,6 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_sys_get_fps" sys-get-fps) :int
     ())
 
-;;TCODLIB_API float TCOD_sys_get_last_frame_length();
-;;TCODLIB_API void TCOD_sys_get_current_resolution(int *w, int *h);
-;; (defvar *internal-width-ptr* nil)
-;; (defvar *internal-height-ptr* nil)
 
 ;; Lisp wrapper needed because actual function returns nothing, whereas we
 ;; want to return resolution.
@@ -2024,12 +1986,6 @@ value (#xRRGGBB)."
   (values (sys-get-current-resolution-x)
           (sys-get-current-resolution-y)))
 
-
-  ;; (with-foreign-object (widthptr :int)
-  ;;   (with-foreign-object (heightptr :int)
-  ;;     (%sys-get-current-resolution widthptr heightptr)
-  ;;     (values (mem-ref widthptr :int)
-  ;;             (mem-ref heightptr :int)))))
 
 
 ;;;; <<Random>> ===============================================================
@@ -2103,20 +2059,12 @@ value (#xRRGGBB)."
 
 	      
 
-;; (let ((rodent nil))
-;;   (defun mouse-get-status ()
-;;     (unless rodent
-;;       (setf rodent (foreign-alloc 'mouse-state)))
-;;     (%mouse-get-status rodent)
-;;     (mouse-state->mouse rodent)))
-
-
 ;;TCODLIB_API TCOD_mouse_t TCOD_mouse_get_status();
 #+nil
 (defcfun ("TCOD_mouse_get_status_wrapper" %mouse-get-status) :void
   (mouseptr :pointer))
 
-;; This causes a crash on Clozure CL on linux.
+;; Old version - creates a foreign struct.
 #+nil
 (defun mouse-get-status ()
   (with-foreign-object (rodent 'mouse-state)
@@ -2124,6 +2072,7 @@ value (#xRRGGBB)."
     (mouse-state->mouse rodent)))
 
 
+;; New version - gets all data from foreign functions.
 (defun mouse-get-status ()
   (make-mouse :x (mouse-get-x)
               :y (mouse-get-y)
@@ -2157,41 +2106,55 @@ value (#xRRGGBB)."
 
 
 ;;TCODLIB_API TCOD_image_t TCOD_image_new(int width, int height);
+(define-c-function ("TCOD_image_new" image-new) image
+  ((width :int) (height :int))
+  "Return a new image, filled with black.")
+
 ;;TCODLIB_API TCOD_image_t TCOD_image_from_console(TCOD_console_t console);
 (define-c-function ("TCOD_image_from_console" image-from-console) image
-  ((con console)))
+  ((con console))
+  "Return a new image whose contents are a 'screenshot' of the
+console =CON=.")
 
 ;;TCODLIB_API TCOD_image_t TCOD_image_load(const char *filename);
 (define-c-function ("TCOD_image_load" image-load) image
-  ((filename :string)))
+  ((filename :string))
+  "Read an image from a file and return it.")
 
 
 ;;TCODLIB_API void TCOD_image_clear(TCOD_image_t image, TCOD_color_t color);
 (define-c-function ("TCOD_image_clear_wrapper" image-clear) :void
-  ((image image) (color colournum)))
+  ((image image) (colour colournum))
+  "Fill the image =IMAGE= with the colour =COLOUR=.")
 
 ;;TCODLIB_API void TCOD_image_save(TCOD_image_t image, const char *filename);
 (define-c-function ("TCOD_image_save" image-save) :void
-  ((image image) (filename :string)))
+  ((image image) (filename :string))
+  "Write the image =IMAGE= to a file. The filename must end in =.BMP=
+or =.PNG=.")
 
 
 ;;TCODLIB_API void TCOD_image_get_size(TCOD_image_t image, int *w,int *h);
 ;;TCODLIB_API TCOD_color_t TCOD_image_get_pixel(TCOD_image_t image,int x, int y);
 (define-c-function ("TCOD_image_get_pixel_wrapper" image-get-pixel) colournum
-  ((image image) (pixel-x :int) (pixel-y :int)))
+  ((image image) (pixel-x :int) (pixel-y :int))
+  "Return the colour of the pixel at =(PIXEL-X, PIXEL-Y)= in =IMAGE=.")
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_image_get_mipmap_pixel(TCOD_image_t image,
 ;; float x0,float y0, float x1, float y1);
 (define-c-function ("TCOD_image_get_mipmap_pixel_wrapper"
 	  image-get-mipmap-pixel) colournum
-  ((image image) (x0 :float) (y0 :float) (x1 :float) (y1 :float)))
+  ((image image) (x0 :float) (y0 :float) (x1 :float) (y1 :float))
+  "Calculate the interpolated colour of the pixel at =(PIXEL-X, PIXEL-Y)=
+in =IMAGE=.")
 
 
 ;;TCODLIB_API void TCOD_image_put_pixel(TCOD_image_t image,int x, int y,
 ;; TCOD_color_t col);
 (define-c-function ("TCOD_image_put_pixel_wrapper" image-put-pixel) :void
-  ((image image) (pixel-x :int) (pixel-y :int) (col colournum)))
+  ((image image) (pixel-x :int) (pixel-y :int) (colour colournum))
+  "Set the colour of the pixel at =(PIXEL-X, PIXEL-Y)= in =IMAGE= to =COLOUR=.")
 
 ;;TCODLIB_API void TCOD_image_blit(TCOD_image_t image, TCOD_console_t console,
 ;; float x, float y, 
@@ -2237,10 +2200,11 @@ value (#xRRGGBB)."
 (defcfun ("TCOD_noise_new" %noise-new) noise
   (dimensions :int) (hurst :float) (lacunarity :float) (randomptr :pointer))
 
-(defun* (noise-new -> noise) ((dimensions fixnum)
+(defun* (noise-new -> noise) ((dimensions uint8)
                               &key ((hurst float) +NOISE-DEFAULT-HURST+)
                               ((lacunarity float) +NOISE-DEFAULT-LACUNARITY+)
                               ((rng randomptr) +NULL+))
+  "Return a new noise object with the given characteristics."
   (%noise-new dimensions hurst lacunarity rng))
 
 
@@ -2250,6 +2214,7 @@ value (#xRRGGBB)."
   (noise noise) (f :pointer))
 
 (defun* (noise-perlin -> float) ((noise noise) &rest nums)
+  "Returns the value of the Perlin noise function at the given coordinates."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
       (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
@@ -2261,6 +2226,7 @@ value (#xRRGGBB)."
   (noise noise) (f :pointer))
 
 (defun* (noise-simplex -> float) ((noise noise) &rest nums)
+  "Returns the value of the simplex noise function at the given coordinates."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
       (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
@@ -2274,6 +2240,9 @@ value (#xRRGGBB)."
   (noise noise) (f :pointer) (octaves :float))
 
 (defun* (noise-fbm-perlin -> float) ((noise noise) (octaves float) &rest nums)
+  "Returns the value of the fractal Brownian motion noise function at the given
+coordinates, using the Hurst and lacunarity values given when the noise
+object was created."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
       (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
@@ -2287,6 +2256,7 @@ value (#xRRGGBB)."
 
 (defun* (noise-turbulence-perlin -> float) ((noise noise) (octaves float)
                                             &rest nums)
+  "Returns the value of the turbulence noise function at the given coordinates."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
       (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
@@ -2295,7 +2265,8 @@ value (#xRRGGBB)."
 
 ;; TCODLIB_API void TCOD_noise_delete(TCOD_noise_t noise);
 (define-c-function ("TCOD_noise_delete" noise-delete) :void
-  ((noise noise)))
+  ((noise noise))
+  "Destroy a noise object.")
 
 
 ;;;; <<Heightmap>> ============================================================
@@ -2303,73 +2274,98 @@ value (#xRRGGBB)."
 
 
 (define-c-function ("TCOD_heightmap_new" heightmap-new) heightmap
-  ((width :int) (height :int)))
+  ((width :int) (height :int))
+  "Return a new heightmap with the given dimensions.")
 
 
 (define-c-function ("TCOD_heightmap_get_value" heightmap-get-value) :float 
   ;; 0 <= x < WIDTH
-  ((heightmap heightmap) (x :int) (y :int)))
+  ((heightmap heightmap) (x :int) (y :int))
+  "Return the height at position =(X, Y)= in the heightmap.")
 
 
 (define-c-function ("TCOD_heightmap_get_interpolated_value"
           heightmap-get-interpolated-value) :float 
   ;; 0 <= x < WIDTH
-  ((heightmap heightmap) (x :float) (y :float)))
+  ((heightmap heightmap) (x :float) (y :float))
+  "Calculate the height at position =(X, Y)= in the heightmap, where the
+coordinates might not be integers.")
 
 
 (define-c-function ("TCOD_heightmap_get_slope" heightmap-get-slope) :float 
-  ((heightmap heightmap) (x :int) (y :int)))
+  ((heightmap heightmap) (x :int) (y :int))
+  "Return the slope at position =(X, Y)= in the heightmap. The value returned
+will be between 0 and pi/2.")
 
 
 (define-c-function ("TCOD_heightmap_set_value" heightmap-set-value) :void
   ;; 0 <= x < WIDTH
-  ((heightmap heightmap) (x :int) (y :int) (value :float)))
+  ((heightmap heightmap) (x :int) (y :int) (value :float))
+  "Set the height at position =(X, Y)= in the heightmap to =VALUE=.")
 
 
 (define-c-function ("TCOD_heightmap_add" heightmap-add) :void
-  ((heightmap heightmap) (value :float)))
+  ((heightmap heightmap) (value :float))
+  "Add =VALUE= to all heights in the heightmap.")
 
 
 (define-c-function ("TCOD_heightmap_add_fbm" heightmap-add-fbm) :void
     ((heightmap heightmap) (noise noise) (mulx :float) (muly :float)
-     (addx :float) (addy :float) (octaves :float) (delta :float) (scale :float)))
+     (addx :float) (addy :float) (octaves :float) (delta :float) (scale :float))
+  "Add values from the random noise object =NOISE= to all heights in
+equivalent positions in =HEIGHTMAP=.")
 
 
 (define-c-function ("TCOD_heightmap_scale" heightmap-scale) :void
-  ((heightmap heightmap) (factor :float)))
+  ((heightmap heightmap) (factor :float))
+  "Multiply all the heights in the heightmap by =SCALE=.")
 
 
 (define-c-function ("TCOD_heightmap_lerp_hm" heightmap-lerp) :void
-  ((hm1 heightmap) (hm2 heightmap) (result heightmap) (coef :float)))
+  ((hm1 heightmap) (hm2 heightmap) (result heightmap) (coef :float))
+  "Fill the heightmap =RESULT= with the results of a lerp operation between
+the two heightmaps =HM1= and =HM2=.")
 
 
 (define-c-function ("TCOD_heightmap_add_hm" heightmap-add-hm) :void
-  ((hm1 heightmap) (hm2 heightmap) (result heightmap)))
+  ((hm1 heightmap) (hm2 heightmap) (result heightmap))
+  "Add the heights in =HM1= to heights in equivalent positions in
+=HM2=, and store the results in the heightmap =RESULT=.")
 
 
 (define-c-function ("TCOD_heightmap_multiply_hm" heightmap-multiply-hm) :void
-  ((hm1 heightmap) (hm2 heightmap) (result heightmap)))
+  ((hm1 heightmap) (hm2 heightmap) (result heightmap))
+  "Multiply the heights in =HM1= by the heights in equivalent positions in
+=HM2=, and store the results in the heightmap =RESULT=.")
 
 
 (define-c-function ("TCOD_heightmap_clear" heightmap-clear) :void
-  ((heightmap heightmap)))
+  ((heightmap heightmap))
+  "Set all the heights in the heightmap to zero.")
 
 
 (define-c-function ("TCOD_heightmap_delete" heightmap-delete) :void
-  ((heightmap heightmap)))
+  ((heightmap heightmap))
+  "Destroy the heightmap object =HEIGHTMAP=.")
 
 
 (define-c-function ("TCOD_heightmap_clamp" heightmap-clamp) :void
-  ((heightmap heightmap) (min :float) (max :float)))
+  ((heightmap heightmap) (min :float) (max :float))
+  "If any height in =HEIGHTMAP= is below =MIN= or above =MAX=, set it
+equal to =MIN= or =MAX= respectively.")
 
 
 (define-c-function ("TCOD_heightmap_count_cells" heightmap-count-cells) :int
-  ((heightmap heightmap) (min :float) (max :float)))
+  ((heightmap heightmap) (min :float) (max :float))
+  "Return the number of cells in =HEIGHTMAP= which contain heights between
+=MIN= and =MAX=.")
 
 
 (define-c-function ("TCOD_heightmap_has_land_on_border"
                     heightmap-has-land-on-border?) :boolean
-  ((heightmap heightmap) (waterlevel :float)))
+  ((heightmap heightmap) (waterlevel :float))
+  "Return true if any of the border cells of =HEIGHTMAP= have heights greater
+than =WATERLEVEL=.")
 
 
 (defcfun ("TCOD_heightmap_get_minmax" %heightmap-get-minmax) :void
@@ -2377,6 +2373,7 @@ value (#xRRGGBB)."
 
 
 (defun* (heightmap-get-min -> float) ((heightmap heightmap))
+  "Return the lowest height in =HEIGHTMAP=."
   (with-foreign-object (minf :float)
     (with-foreign-object (maxf :float)
       (%heightmap-get-minmax heightmap minf maxf)
@@ -2384,6 +2381,7 @@ value (#xRRGGBB)."
 
 
 (defun* (heightmap-get-max -> float) ((heightmap heightmap))
+  "Return the highest height in =HEIGHTMAP=."
   (with-foreign-object (minf :float)
     (with-foreign-object (maxf :float)
       (%heightmap-get-minmax heightmap minf maxf)
@@ -2392,7 +2390,9 @@ value (#xRRGGBB)."
 
 
 (define-c-function ("TCOD_heightmap_normalize" heightmap-normalize) :void
-  ((heightmap heightmap) (min :float) (max :float)))
+  ((heightmap heightmap) (min :float) (max :float))
+  "Scale all the heights in =HEIGHTMAP= so that the lowest is equal to
+=MIN= and the highest is equal to =MAX=.")
 
 
 (declaim (inline heightmap-normalise))
@@ -2401,7 +2401,8 @@ value (#xRRGGBB)."
 
 
 (define-c-function ("TCOD_heightmap_copy" heightmap-copy) :void
-  ((source heightmap) (dest heightmap)))
+  ((source heightmap) (dest heightmap))
+  "Copy the heightmap =SOURCE= into the heightmap object =DEST=.")
 
 
 (defcfun ("TCOD_heightmap_rain_erosion" %heightmap-rain-erosion) :void
@@ -2413,6 +2414,8 @@ value (#xRRGGBB)."
                                 (erosion-coef float)
                                 (sedimentation-coef float)
                                &optional ((rng randomptr) +NULL+))
+  "'Erode' the heightmap =HEIGHTMAP= by dropping =NUM-DROPS= 'raindrops' in
+random locations."
   (%heightmap-rain-erosion heightmap num-drops erosion-coef
                            sedimentation-coef rng))
 
@@ -2425,6 +2428,7 @@ value (#xRRGGBB)."
 (defun* heightmap-dig-bezier ((heightmap heightmap) (coords list)
                               (start-radius float) (start-depth float)
                               (end-radius float) (end-depth float))
+  "Carve a path through =HEIGHTMAP= using a cubic Bezier curve."
   (with-foreign-object (px :int 4)
     (with-foreign-object (py :int 4)
       (dotimes (i 4)
@@ -2450,32 +2454,43 @@ value (#xRRGGBB)."
 
 ;; Create a map
 (define-c-function ("TCOD_map_new" map-new) mapptr
-    ((width :int) (height :int)))
+    ((width :int) (height :int))
+  "Return a new map object of the given dimensions.")
 
 (define-c-function ("TCOD_map_set_properties" map-set-properties) :void
-    ((map mapptr) (x :int) (y :int) (transparent? :boolean) (walkable? :boolean)))
+    ((map mapptr) (x :int) (y :int) (transparent? :boolean) (walkable? :boolean))
+  "Set the properties of the map cell at =(X, Y)=. It is walkable if
+=walkable?= is true, and transparent if =transparent?= is true.")
 
 (define-c-function ("TCOD_map_compute_fov" map-compute-fov) :void
     ((map mapptr) (player-x :int) (player-y :int) (max-radius :int)
-     (light-walls? :boolean) (algorithm fov-algorithm)))
+     (light-walls? :boolean) (algorithm fov-algorithm))
+  "Compute field of view information for =MAP=, assuming the player is at
+=(PLAYER-X, PLAYER-Y)=, and using the field of view algorithm =ALGORITHM=.")
 
 (define-c-function ("TCOD_map_is_in_fov" map-is-in-fov?) :boolean
-    ((map mapptr) (x :int) (y :int)))
+    ((map mapptr) (x :int) (y :int))
+  "Return true if position =(X, Y)= on the map is visible.")
 
 (define-c-function ("TCOD_map_is_transparent" map-is-transparent?) :boolean
-    ((map mapptr) (x :int) (y :int)))
+    ((map mapptr) (x :int) (y :int))
+  "Return true if position =(X, Y)= on the map is set to be transparent.")
 
 (define-c-function ("TCOD_map_is_walkable" map-is-walkable?) :boolean
-    ((map mapptr) (x :int) (y :int)))
+    ((map mapptr) (x :int) (y :int))
+  "Return true if position =(X, Y)= on the map is set to be walkable.")
 
 (define-c-function ("TCOD_map_clear" map-clear) :void
-    ((map mapptr)))
+    ((map mapptr))
+  "Set all cells in =MAP= to be neither walkable nor transparent.")
 
 (define-c-function ("TCOD_map_delete" map-delete) :void
-    ((map mapptr)))
+    ((map mapptr))
+  "Destroy the map object =MAP=.")
 
 (define-c-function ("TCOD_map_copy" map-copy) :void
-    ((map-src mapptr) (map-dest mapptr)))
+    ((map-src mapptr) (map-dest mapptr))
+  "Copy the map object =SRC= into the new map object =DEST=.")
 
 
 
@@ -2493,7 +2508,8 @@ value (#xRRGGBB)."
 
 
 (define-c-function ("TCOD_path_new_using_map" path-new-using-map) a*-path
-    ((map mapptr) (diagonal-cost :float)))
+    ((map mapptr) (diagonal-cost :float))
+  "Return a new A* path object, using the map =MAP=.")
 
 ;; Call like this:
 ;;   (tcod:path-new-using-function x y (callback my-a*-callback) ptr)
@@ -2501,18 +2517,24 @@ value (#xRRGGBB)."
 ;; (see above).
 (define-c-function ("TCOD_path_new_using_function" path-new-using-function) a*-path
     ((xdim :int) (ydim :int) (callback :pointer) (user-data :pointer)
-     (diagonal-cost :float)))
+     (diagonal-cost :float))
+  "Return a new A* path object, which will call the function =CALLBACK= to
+calculate movement costs.")
 
 (define-c-function ("TCOD_path_delete" path-delete) :void
-    ((a*-path a*-path)))
+    ((a*-path a*-path))
+  "Delete an A* path object.")
 
 (define-c-function ("TCOD_path_compute" path-compute) :boolean
-    ((a*-path a*-path) (ox :int) (oy :int) (dx :int) (dy :int)))
+    ((a*-path a*-path) (ox :int) (oy :int) (dx :int) (dy :int))
+  "Compute the path between the two points =(OX,OY)= and =(DX,DY)=, using the
+A* algorithm.")
 
 (defcfun ("TCOD_path_get_origin" %path-get-origin) :void
   (a*-path a*-path) (xptr :pointer) (yptr :pointer))
 
 (defun* (path-get-origin -> (cons fixnum fixnum)) ((a*-path a*-path))
+  "Return the coordinates of the current origin of the A* path =PATH=."
   (with-foreign-object (x :int)
     (with-foreign-object (y :int)
       (%path-get-origin a*-path x y)
@@ -2522,18 +2544,22 @@ value (#xRRGGBB)."
   (a*-path a*-path) (xptr :pointer) (yptr :pointer))
 
 (defun* (path-get-destination -> (cons fixnum fixnum)) ((a*-path a*-path))
+  "Return the coordinates of the current destination of the A* path =PATH=."
   (with-foreign-object (x :int)
     (with-foreign-object (y :int)
       (%path-get-destination a*-path x y)
       (cons (mem-aref x :int) (mem-aref y :int)))))
 
 (define-c-function ("TCOD_path_size" path-size) :int
-    ((a*-path a*-path)))
+    ((a*-path a*-path))
+  "Return the number of steps in the path.")
 
 (defcfun ("TCOD_path_get" %path-get) :void
   (a*-path a*-path) (index :int) (xptr :pointer) (yptr :pointer))
 
 (defun* (path-get -> (cons fixnum fixnum)) ((a*-path a*-path) (index fixnum))
+  "Return the INDEXth step in the path from its current origin to its current
+destination."
   (with-foreign-object (x :int)
     (with-foreign-object (y :int)
       (%path-get a*-path index x y)
@@ -2543,7 +2569,9 @@ value (#xRRGGBB)."
   (a*-path a*-path) (xptr :pointer) (yptr :pointer) (recalc-when-needed? :boolean))
 
 (defun* (path-walk -> (or null (cons fixnum fixnum))) ((a*-path a*-path)
-                                                         (recalc-when-needed? boolean))
+                                                       (recalc-when-needed? boolean))
+  "Move one step along =PATH=. The path becomes one step shorter. Returns
+the coordinates of the new location."
   (with-foreign-object (x :int)
     (with-foreign-object (y :int)
       (if (%path-walk a*-path x y recalc-when-needed?)
@@ -2551,53 +2579,70 @@ value (#xRRGGBB)."
           nil))))
 
 (define-c-function ("TCOD_path_is_empty" path-is-empty?) :boolean
-  ((a*-path a*-path)))
+  ((a*-path a*-path))
+  "Return true if the path object is empty (has zero steps).")
 
 
 ;; <<Dijkstra pathfinding>> ===================================================
 
 
 (define-c-function ("TCOD_dijkstra_new" dijkstra-new) dijkstra-path
-    ((map mapptr) (diagonal-cost :float)))
+    ((map mapptr) (diagonal-cost :float))
+  "Return a new Dijkstra path object which uses =MAP=.")
 
 (define-c-function ("TCOD_dijkstra_new_using_function" dijkstra-new-using-function)
     dijkstra-path
     ((xdim :int) (ydim :int) (callback :pointer) (user-data :pointer)
-     (diagonal-cost :float)))
+     (diagonal-cost :float))
+  "Return a new Dijkstra path object which calls the function =CALLBACK= to
+calculate movement costs.")
 
 (define-c-function ("TCOD_dijkstra_delete" dijkstra-delete) :void
-    ((dijkstra-path dijkstra-path)))
+    ((dijkstra-path dijkstra-path))
+  "Delete a Dijkstra path object.")
 
 (define-c-function ("TCOD_dijkstra_compute" dijkstra-compute) :void
-    ((dijkstra-path dijkstra-path) (rootx :int) (rooty :int)))
+    ((dijkstra-path dijkstra-path) (rootx :int) (rooty :int))
+  "Compute paths leading to the point at =(ROOTX, ROOTY)=, using the
+Dijkstra algorithm.")
 
 (define-c-function ("TCOD_dijkstra_path_set" dijkstra-path-set) :boolean
-    ((dijkstra-path dijkstra-path) (to-x :int) (to-y :int)))
+    ((dijkstra-path dijkstra-path) (to-x :int) (to-y :int))
+  "Return true if a path can be found leading from the root node to the
+point at =(TO-X, TO-Y)=.")
 
 (define-c-function ("TCOD_dijkstra_size" dijkstra-size) :int
-    ((dijkstra-path dijkstra-path)))
+    ((dijkstra-path dijkstra-path))
+  "Return the number of steps in the path.")
 
 (define-c-function ("TCOD_dijkstra_get_distance" dijkstra-get-distance) :float
-    ((dijkstra-path dijkstra-path) (to-x :int) (to-y :int)))
+    ((dijkstra-path dijkstra-path) (to-x :int) (to-y :int))
+  "Return the number of steps on the path leading from the root node to
+the point at =(TO-X, TO-Y)=.")
 
 (defcfun ("TCOD_dijkstra_get" %dijkstra-get) :void
   (dijkstra-path dijkstra-path) (index :int) (xptr :pointer) (yptr :pointer))
 
 (defun* (dijkstra-get -> (cons fixnum fixnum)) ((dijkstra-path dijkstra-path)
                                                   (index fixnum))
+  "Return the INDEXth step in the path from its current origin to its current
+destination."
   (with-foreign-object (x :int)
     (with-foreign-object (y :int)
       (%dijkstra-get dijkstra-path index x y)
       (cons (mem-aref x :int) (mem-aref y :int)))))
 
 (define-c-function ("TCOD_dijkstra_is_empty" dijkstra-is-empty?) :boolean
-    ((dijkstra-path dijkstra-path)))
+    ((dijkstra-path dijkstra-path))
+  "Return true if the path object is empty (has zero steps).")
 
 (defcfun ("TCOD_dijkstra_path_walk" %dijkstra-path-walk) :boolean
   (dijkstra-path dijkstra-path) (xptr :pointer) (yptr :pointer))
 
 (defun* (dijkstra-path-walk -> (or null (cons fixnum fixnum)))
     ((dijkstra-path dijkstra-path))
+  "Move one step along =PATH=. The path becomes one step shorter. Returns
+the coordinates of the new location."
   (with-foreign-object (x :int)
     (with-foreign-object (y :int)
       (if (%dijkstra-path-walk dijkstra-path x y)
@@ -2614,3 +2659,7 @@ value (#xRRGGBB)."
   (tcod:console-print-centre tcod:*root* 40 25 :none "Hello World!")
   (tcod:console-flush)
   (tcod:console-wait-for-keypress t))
+
+
+
+;;;; tcod.lisp ends here ======================================================
