@@ -757,6 +757,8 @@ name."
 (deftype uint () `(unsigned-byte ,(* 8 (foreign-type-size :int))))
 (deftype uchar () `(unsigned-byte ,(* 8 (foreign-type-size :unsigned-char))))
 
+(deftype sint16 () `(signed-byte 16))
+
 (deftype ucoord () `(integer 0 1000))
 
 
@@ -1035,25 +1037,28 @@ to the structure used by libtcod."
         (mbutton :boolean)
         (lbutton-pressed :boolean)
         (rbutton-pressed :boolean)
-        (mbutton-pressed :boolean))
+        (mbutton-pressed :boolean)
+        (wheel-up :boolean)
+        (wheel-down :boolean))
 
 (defstruct mouse
   "Structure used by CL-TCOD to represent mouse status."
   (x 0 :type uint16) ;; absolute position
   (y 0 :type uint16)	
-  (dx 0 :type uint16) ;; movement since last update in pixels
-  (dy 0 :type uint16)
+  (dx 0 :type sint16) ;; movement since last update in pixels
+  (dy 0 :type sint16)
   (cx 0 :type uint16) ;; cell coordinates in the root console 
   (cy 0 :type uint16)
-  (dcx 0 :type uint16)	;; movement since last update in console cells
-  (dcy 0 :type uint16)
+  (dcx 0 :type sint16)	;; movement since last update in console cells
+  (dcy 0 :type sint16)
   (lbutton nil :type boolean)                ;; left button status
   (rbutton nil :type boolean)                ;; right button status
   (mbutton nil :type boolean)                ;; middle button status
   (lbutton-pressed nil :type boolean)        ;; left button pressed event
   (rbutton-pressed nil :type boolean)        ;; right button pressed event
-  (mbutton-pressed nil :type boolean))       ;; middle button pressed event
-
+  (mbutton-pressed nil :type boolean)        ;; middle button pressed event
+  (wheel-up nil :type boolean)
+  (wheel-down nil :type boolean))
 
 ;; TCOD_image_t
 (define-c-type image :pointer)
@@ -1878,11 +1883,14 @@ value (#xRRGGBB)."
   `(boole boole-and ,a ,b))
 
 
+(defun key-bitfield->vk (key-bf)
+  (foreign-enum-keyword 'keycode
+                        (and& (ash key-bf -16) #x00FF)))
+
+
 (defun* key->keypress ((key-bf (unsigned-byte 32)))
   (let ((flags (ash key-bf -24)))
-    (make-key :vk (foreign-enum-keyword
-                   'keycode
-                   (and& (ash key-bf -16) #x00FF)) ;;(ldb (byte 8 16) key-bf)
+    (make-key :vk (key-bitfield->vk key-bf) ;;(ldb (byte 8 16) key-bf)
               :c (code-char (and& key-bf #x0000FFFF))  ;;(ldb (byte 16 0) key-bf)
 	      :pressed (get-bit flags 1)
 	      :lalt (get-bit flags 2)
@@ -1893,14 +1901,14 @@ value (#xRRGGBB)."
 
 
 ;;TCODLIB_API TCOD_key_t TCOD_console_check_for_keypress(int flags);
-(defcfun ("TCOD_console_check_for_keypress_wrapper"
+(defcfun ("TCOD_console_check_for_keypress_bitfield"
           %console-check-for-keypress) :int
     (flags key-state))
 
 
 (defun* (console-check-for-keypress -> (or null key)) ((flags key-state))
   (let ((key-bf (%console-check-for-keypress flags)))
-    (if (zerop key-bf)
+    (if (eql (key-bitfield->vk key-bf) :none)
         nil
         (key->keypress key-bf))))
 
@@ -1915,7 +1923,7 @@ value (#xRRGGBB)."
 
 
 ;;TCODLIB_API TCOD_key_t TCOD_console_wait_for_keypress(bool flush);
-(defcfun ("TCOD_console_wait_for_keypress_wrapper"
+(defcfun ("TCOD_console_wait_for_keypress_bitfield"
           %console-wait-for-keypress) :int
   (flush? :boolean))
 
@@ -2022,6 +2030,9 @@ value (#xRRGGBB)."
 ;;;; <<Mouse>> ================================================================
 
 
+;; This may not work, because each time any one of these functions is called,
+;; a mouse state is fetched. Events such as release of a mouse button might
+;; only appear in a single mouse state.
 (defcfun ("TCOD_mouse_get_x" mouse-get-x) :int)
 (defcfun ("TCOD_mouse_get_y" mouse-get-y) :int)
 (defcfun ("TCOD_mouse_get_cx" mouse-get-cx) :int)
@@ -2041,32 +2052,40 @@ value (#xRRGGBB)."
     :unsigned-int)
 
 
-(defun mouse-state->mouse (ms)
-    (make-mouse :x (foreign-slot-value ms 'mouse-state 'x)
-		:y (foreign-slot-value ms 'mouse-state 'y)
-		:dx (foreign-slot-value ms 'mouse-state 'dx)
-		:dy (foreign-slot-value ms 'mouse-state 'dy)
-		:cx (foreign-slot-value ms 'mouse-state 'cx)
-		:cy (foreign-slot-value ms 'mouse-state 'cy)
-		:dcx (foreign-slot-value ms 'mouse-state 'dcx)
-		:dcy (foreign-slot-value ms 'mouse-state 'dcy)
-		:lbutton (foreign-slot-value ms 'mouse-state 'lbutton)
-		:rbutton (foreign-slot-value ms 'mouse-state 'rbutton)
-		:mbutton (foreign-slot-value ms 'mouse-state 'mbutton)
-		:lbutton-pressed (foreign-slot-value ms 'mouse-state 'lbutton-pressed)
-		:rbutton-pressed (foreign-slot-value ms 'mouse-state 'rbutton-pressed)
-		:mbutton-pressed (foreign-slot-value ms 'mouse-state 'mbutton-pressed)))
+#+nil
+(defun* (mouse-state->mouse -> mouse) (ms)
+  ;;(let ((flags (foreign-slot-value ms 'mouse-state 'flags)))
+  (break)
+  (make-mouse :x (foreign-slot-value ms 'mouse-state 'x)
+              :y (foreign-slot-value ms 'mouse-state 'y)
+              :dx (foreign-slot-value ms 'mouse-state 'dx)
+              :dy (foreign-slot-value ms 'mouse-state 'dy)
+              :cx (foreign-slot-value ms 'mouse-state 'cx)
+              :cy (foreign-slot-value ms 'mouse-state 'cy)
+              :dcx (foreign-slot-value ms 'mouse-state 'dcx)
+              :dcy (foreign-slot-value ms 'mouse-state 'dcy)
+              ;; :lbutton (get-bit flags 1)
+              ;; :rbutton (get-bit flags 2)
+              ;; :mbutton (get-bit flags 3)
+              ;; :lbutton-pressed (get-bit flags 4)
+              ;; :rbutton-pressed (get-bit flags 5)
+              ;; :mbutton-pressed (get-bit flags 6))))
+              :lbutton (foreign-slot-value ms 'mouse-state 'lbutton)
+              :rbutton (foreign-slot-value ms 'mouse-state 'rbutton)
+              :mbutton (foreign-slot-value ms 'mouse-state 'mbutton)
+              :lbutton-pressed (foreign-slot-value ms 'mouse-state 'lbutton-pressed)
+              :rbutton-pressed (foreign-slot-value ms 'mouse-state 'rbutton-pressed)
+              :mbutton-pressed (foreign-slot-value ms 'mouse-state 'mbutton-pressed)))
 
 	      
 
 ;;TCODLIB_API TCOD_mouse_t TCOD_mouse_get_status();
-#+nil
 (defcfun ("TCOD_mouse_get_status_wrapper" %mouse-get-status) :void
   (mouseptr :pointer))
 
 ;; Old version - creates a foreign struct.
 #+nil
-(defun mouse-get-status ()
+(defun* (mouse-get-status -> mouse) ()
   (with-foreign-object (rodent 'mouse-state)
     (%mouse-get-status rodent)
     (mouse-state->mouse rodent)))
@@ -2074,6 +2093,7 @@ value (#xRRGGBB)."
 
 ;; New version - gets all data from foreign functions.
 (defun mouse-get-status ()
+  (%mouse-get-status (null-pointer))
   (make-mouse :x (mouse-get-x)
               :y (mouse-get-y)
               :dx (mouse-get-dx)
@@ -2086,8 +2106,8 @@ value (#xRRGGBB)."
               :rbutton (plusp (mouse-get-rbutton))
               :mbutton (plusp (mouse-get-mbutton))
               :lbutton-pressed (plusp (mouse-get-lbutton-pressed))
-              :rbutton-pressed (plusp (mouse-get-mbutton-pressed))
-              :mbutton-pressed (plusp (mouse-get-rbutton-pressed))))
+              :rbutton-pressed (plusp (mouse-get-rbutton-pressed))
+              :mbutton-pressed (plusp (mouse-get-mbutton-pressed))))
 
 
 
