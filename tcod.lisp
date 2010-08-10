@@ -75,14 +75,18 @@
    #:console-get-background-colour
    #:console-get-foreground-color
    #:console-get-background-color
-   #:console-print-left
-   #:console-print-right
-   #:console-print-centre
-   #:console-print-center
-   #:console-print-left-rect
-   #:console-print-right-rect
-   #:console-print-centre-rect
-   #:console-print-center-rect
+   #:console-print
+   #:console-print-ex
+   #:console-print-rect
+   #:console-print-rect-ex
+   ;; #:console-print-left
+   ;; #:console-print-right
+   ;; #:console-print-centre
+   ;; #:console-print-center
+   ;; #:console-print-left-rect
+   ;; #:console-print-right-rect
+   ;; #:console-print-centre-rect
+   ;; #:console-print-center-rect
    #:console-hline
    #:console-vline
    #:console-print-frame
@@ -90,10 +94,11 @@
    #:console-map-ascii-code-to-font
    #:console-map-ascii-codes-to-font
    #:console-map-string-to-font
-   #:console-height-left-rect
-   #:console-height-right-rect
-   #:console-height-centre-rect
-   #:console-height-center-rect
+   #:console-get-height-rect
+   ;; #:console-height-left-rect
+   ;; #:console-height-right-rect
+   ;; #:console-height-centre-rect
+   ;; #:console-height-center-rect
    #:legal-console-coordinates?
    #:console-put-char
    #:console-put-char-ex
@@ -358,7 +363,7 @@ with libtcod.
 ;;;   (tcod:console-set-custom-font \"terminal.png\" '(:font-layout-ascii-in-row) 16 16)
 ;;;   (tcod:console-init-root 80 25 \"Test\" nil)
 ;;;   (tcod:console-clear tcod:*root*)
-;;;   (tcod:console-print-left tcod:*root* 1 1 :set \"Hello, world!~%\")
+;;;   (tcod:console-print tcod:*root* 1 1 \"Hello, world!~%\")
 ;;;   (tcod:console-wait-for-keypress t)
 
                                               
@@ -448,13 +453,12 @@ have been modified to instead accept arguments to Common Lisp's =format=
 function.'  For example:
 
 #+BEGIN_SRC c
-  TCOD_console_print_left (con, x, y, TCOD_BKGND_SET,
-      \"Printing at %d, %d\n\", x, y);
+  TCOD_console_print (con, x, y, \"Printing at %d, %d\n\", x, y);
 #+END_SRC
 
 becomes:
 
-;;;    (tcod:console-print-left con x y :set \"Printing at ~D, ~D~%\" x y)
+;;;    (tcod:console-print con x y \"Printing at ~D, ~D~%\" x y)
 
 ** Miscellaneous extra functions
 
@@ -1251,13 +1255,13 @@ value (#xRRGGBB)."
   (colour-set-hsv con hue sat v))
 
 
-(define-c-function ("TCOD_color_get_hue" colour-get-hue) :int
+(define-c-function ("TCOD_color_get_hue_" colour-get-hue) :int
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_saturation" colour-get-saturation) :int
+(define-c-function ("TCOD_color_get_saturation_" colour-get-saturation) :int
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_value" colour-get-value) :int
+(define-c-function ("TCOD_color_get_value_" colour-get-value) :int
     ((c colournum)))
 
 
@@ -1468,15 +1472,62 @@ value (#xRRGGBB)."
 
 ;; This has to have a separate lisp wrapper, as we need to be able
 ;; to pass 'args...' to lisp.
-(defcfun ("TCOD_console_print_left" %console-print-left) :void
-  (con console) (x :int) (y :int) (flag background-flag) (fmt :string)
-  &rest)
+;; (defcfun ("TCOD_console_print_left" %console-print-left) :void
+;;   (con console) (x :int) (y :int) (flag background-flag) (fmt :string)
+;;   &rest)
+;; 
+;; (defun* console-print-left ((con console) (x ucoord) (y ucoord)
+;;                             (flag background-flag) (fmt string)
+;;                             &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-print-left con x y flag (apply #'format nil fmt args)))
 
-(defun* console-print-left ((con console) (x ucoord) (y ucoord)
-                            (flag background-flag) (fmt string)
-                            &rest args)
+
+(define-c-function ("TCOD_console_set_background_flag"
+                    console-set-background-flag) :void
+    ((con console) (flag background-flag))
+  (call-it))
+
+
+(define-c-function ("TCOD_console_get_background_flag"
+                    console-get-background-flag) background-flag
+    ((con console))
+  (call-it))
+
+
+(define-c-function ("TCOD_console_set_alignment"
+                    console-set-alignment) :void
+    ((con console) (align alignment))
+  (call-it))
+
+
+(define-c-function ("TCOD_console_get_alignment"
+                    console-set-alignment) alignment
+    ((con console))
+  (call-it))
+
+
+(defcfun ("TCOD_console_print" %console-print) :void
+  (con console) (x :int) (y :int) (fmt :string) &rest)
+
+
+(defun* console-print ((con console) (x ucoord) (y ucoord)
+                            (fmt string) &rest args)
   (assert (legal-console-coordinates? con x y))
-  (%console-print-left con x y flag (apply #'format nil fmt args)))
+  (%console-print con x y (apply #'format nil fmt args)))
+
+
+(defcfun ("TCOD_console_print_ex" %console-print-ex) :void
+  (con console) (x :int) (y :int) (flag background-flag)
+  (alignment align) (fmt :string) &rest)
+
+
+(defun* console-print-ex ((con console) (x ucoord) (y ucoord)
+                          (flag background-flag) (align alignment)
+                            (fmt string) &rest args)
+  (assert (legal-console-coordinates? con x y))
+  (%console-print-ex con x y flag align
+                     (apply #'format nil fmt args)))
 
 
 ;; In wrapper.c
@@ -1491,78 +1542,102 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API void TCOD_console_print_right(TCOD_console_t con,int x, int y,
 ;; TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
-(defcfun ("TCOD_console_print_right" %console-print-right) :void
-	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
-	&rest)
-
-(defun* console-print-right ((con console) (x ucoord) (y ucoord)
-                             (flag background-flag) (fmt string) &rest args)
-  (assert (legal-console-coordinates? con x y))
-  (%console-print-right con x y flag (apply #'format nil fmt args)))
+;; (defcfun ("TCOD_console_print_right" %console-print-right) :void
+;; 	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-print-right ((con console) (x ucoord) (y ucoord)
+;;                              (flag background-flag) (fmt string) &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-print-right con x y flag (apply #'format nil fmt args)))
 
 ;;TCODLIB_API void TCOD_console_print_center(TCOD_console_t con,int x, int y,
 ;; TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
-(defcfun ("TCOD_console_print_center" %console-print-centre) :void
-	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
-	&rest)
-
-(defun* console-print-centre ((con console) (x ucoord) (y ucoord)
-                              (flag background-flag) (fmt string)
-                              &rest args)
-  (assert (legal-console-coordinates? con x y))
-  (%console-print-centre con x y flag (apply #'format nil fmt args)))
-
-(declaim (inline console-print-center))
-(defun console-print-center (con x y flag fmt &rest args)
-  (apply #'console-print-centre con x y flag fmt args))
+;; (defcfun ("TCOD_console_print_center" %console-print-centre) :void
+;; 	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-print-centre ((con console) (x ucoord) (y ucoord)
+;;                               (flag background-flag) (fmt string)
+;;                               &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-print-centre con x y flag (apply #'format nil fmt args)))
+;; 
+;; (declaim (inline console-print-center))
+;; (defun console-print-center (con x y flag fmt &rest args)
+;;   (apply #'console-print-centre con x y flag fmt args))
 
 
 ;;TCODLIB_API int TCOD_console_print_left_rect(TCOD_console_t con,int x, int y,
 ;; int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
-(defcfun ("TCOD_console_print_left_rect" %console-print-left-rect) :int
-	(con console) (x :int) (y :int) (w :int) (h :int)
-	(flag background-flag) (fmt :string)
-	&rest)
-
-(defun* console-print-left-rect ((con console) (x ucoord) (y ucoord)
-                                 (w ucoord) (h ucoord)
-                                 (flag background-flag) (fmt string) &rest args)
-  (assert (legal-console-coordinates? con x y))
-  (%console-print-left-rect con x y w h flag
-                            (apply #'format nil fmt args)))
+;; (defcfun ("TCOD_console_print_left_rect" %console-print-left-rect) :int
+;; 	(con console) (x :int) (y :int) (w :int) (h :int)
+;; 	(flag background-flag) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-print-left-rect ((con console) (x ucoord) (y ucoord)
+;;                                  (w ucoord) (h ucoord)
+;;                                  (flag background-flag) (fmt string) &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-print-left-rect con x y w h flag
+;;                             (apply #'format nil fmt args)))
 
 ;;TCODLIB_API int TCOD_console_print_right_rect(TCOD_console_t con,int x,
 ;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
-(defcfun ("TCOD_console_print_right_rect" %console-print-right-rect) :int
-	(con console) (x :int) (y :int) (w :int) (h :int)
-	(flag background-flag) (fmt :string)
-	&rest)
+;; (defcfun ("TCOD_console_print_right_rect" %console-print-right-rect) :int
+;; 	(con console) (x :int) (y :int) (w :int) (h :int)
+;; 	(flag background-flag) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-print-right-rect ((con console) (x ucoord) (y ucoord)
+;;                                   (w ucoord) (h ucoord)
+;;                                   (flag background-flag) (fmt string) &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-print-right-rect con x y w h flag
+;;                              (apply #'format nil fmt args)))
 
-(defun* console-print-right-rect ((con console) (x ucoord) (y ucoord)
+
+(defcfun ("TCOD_console_print_rect" %console-print-rect) :int
+	(con console) (x :int) (y :int) (w :int) (h :int)
+	(fmt :string) &rest)
+
+(defun* console-print-rect ((con console) (x ucoord) (y ucoord)
                                   (w ucoord) (h ucoord)
-                                  (flag background-flag) (fmt string) &rest args)
+                                  (fmt string) &rest args)
   (assert (legal-console-coordinates? con x y))
-  (%console-print-right-rect con x y w h flag
-                             (apply #'format nil fmt args)))
+  (%console-print-rect con x y w h (apply #'format nil fmt args)))
+
+
+(defcfun ("TCOD_console_print_rect_ex" %console-print-rect-ex) :int
+	(con console) (x :int) (y :int) (w :int) (h :int)
+	(flag background-flag) (align alignment) (fmt :string) &rest)
+
+(defun* console-print-rect-ex ((con console) (x ucoord) (y ucoord)
+                               (w ucoord) (h ucoord)
+                               (flag background-flag) (align alignment)
+                               (fmt string) &rest args)
+  (assert (legal-console-coordinates? con x y))
+  (%console-print-rect-ex con x y w h flag align
+                          (apply #'format nil fmt args)))
 
 
 ;;TCODLIB_API int TCOD_console_print_center_rect(TCOD_console_t con,int x,
 ;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
-(defcfun ("TCOD_console_print_center_rect" %console-print-centre-rect) :int
-	(con console) (x :int) (y :int) (w :int) (h :int)
-	(flag background-flag) (fmt :string)
-	&rest)
-
-(defun* console-print-centre-rect ((con console) (x ucoord) (y ucoord)
-                                   (w ucoord) (h ucoord)
-                                   (flag background-flag) (fmt string) &rest args)
-  (assert (legal-console-coordinates? con x y))
-  (%console-print-centre-rect con x y w h flag
-                              (apply #'format nil fmt args)))
-
-(declaim (inline console-print-center-rect))
-(defun console-print-center-rect (con x y w h flag fmt &rest args)
-  (apply #'console-print-centre-rect con x y w h flag fmt args))
+;; (defcfun ("TCOD_console_print_center_rect" %console-print-centre-rect) :int
+;; 	(con console) (x :int) (y :int) (w :int) (h :int)
+;; 	(flag background-flag) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-print-centre-rect ((con console) (x ucoord) (y ucoord)
+;;                                    (w ucoord) (h ucoord)
+;;                                    (flag background-flag) (fmt string) &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-print-centre-rect con x y w h flag
+;;                               (apply #'format nil fmt args)))
+;; 
+;; (declaim (inline console-print-center-rect))
+;; (defun console-print-center-rect (con x y w h flag fmt &rest args)
+;;   (apply #'console-print-centre-rect con x y w h flag fmt args))
 
 
 
@@ -1577,45 +1652,55 @@ value (#xRRGGBB)."
   (call-it))
 
 
-;;TCODLIB_API int TCOD_console_height_left_rect(TCOD_console_t con,
-;;     int x, int y, int w, int h, const char *fmt, ...);
 
-(defcfun ("TCOD_console_height_left_rect" %console-height-left-rect) :int
+(defcfun ("TCOD_console_get_height_rect" %console-get-height-rect) :int
 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
 	&rest)
 
-(defun* console-height-left-rect ((con console) (x ucoord) (y ucoord)
+(defun* console-get-height-rect ((con console) (x ucoord) (y ucoord)
                                  (w ucoord) (h ucoord) (fmt string) &rest args)
   (assert (legal-console-coordinates? con x y))
-  (%console-height-left-rect con x y w h (apply #'format nil fmt args)))
+  (%console-get-height-rect con x y w h (apply #'format nil fmt args)))
+
+;;TCODLIB_API int TCOD_console_height_left_rect(TCOD_console_t con,
+;;     int x, int y, int w, int h, const char *fmt, ...);
+
+;; (defcfun ("TCOD_console_height_left_rect" %console-height-left-rect) :int
+;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-height-left-rect ((con console) (x ucoord) (y ucoord)
+;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-height-left-rect con x y w h (apply #'format nil fmt args)))
 
 ;;TCODLIB_API int TCOD_console_height_right_rect(TCOD_console_t con,
 ;;     int x, int y, int w, int h, const char *fmt, ...);
 
-(defcfun ("TCOD_console_height_right_rect" %console-height-right-rect) :int
-	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
-	&rest)
-
-(defun* console-height-right-rect ((con console) (x ucoord) (y ucoord)
-                                 (w ucoord) (h ucoord) (fmt string) &rest args)
-  (assert (legal-console-coordinates? con x y))
-  (%console-height-right-rect con x y w h (apply #'format nil fmt args)))
+;; (defcfun ("TCOD_console_height_right_rect" %console-height-right-rect) :int
+;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-height-right-rect ((con console) (x ucoord) (y ucoord)
+;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-height-right-rect con x y w h (apply #'format nil fmt args)))
 
 ;;TCODLIB_API int TCOD_console_height_center_rect(TCOD_console_t con,
 ;;     int x, int y, int w, int h, const char *fmt, ...);
 
-(defcfun ("TCOD_console_height_center_rect" %console-height-centre-rect) :int
-	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
-	&rest)
-
-(defun* console-height-centre-rect ((con console) (x ucoord) (y ucoord)
-                                 (w ucoord) (h ucoord) (fmt string) &rest args)
-  (assert (legal-console-coordinates? con x y))
-  (%console-height-centre-rect con x y w h (apply #'format nil fmt args)))
-
-(declaim (inline console-height-center-rect))
-(defun console-height-center-rect (con x y w h fmt &rest args)
-  (apply #'console-height-centre-rect con x y w h fmt args))
+;; (defcfun ("TCOD_console_height_center_rect" %console-height-centre-rect) :int
+;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
+;; 	&rest)
+;; 
+;; (defun* console-height-centre-rect ((con console) (x ucoord) (y ucoord)
+;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
+;;   (assert (legal-console-coordinates? con x y))
+;;   (%console-height-centre-rect con x y w h (apply #'format nil fmt args)))
+;; 
+;; (declaim (inline console-height-center-rect))
+;; (defun console-height-center-rect (con x y w h fmt &rest args)
+;;   (apply #'console-height-centre-rect con x y w h fmt args))
 
 
 ;;TCODLIB_API void TCOD_console_hline(TCOD_console_t con,int x,int y, int l,
