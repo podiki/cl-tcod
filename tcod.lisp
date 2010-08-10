@@ -13,7 +13,9 @@
 ;;; - to start the colour system call START-COLOURS.
 ;;; - to make a new colour and associate it with a name, use MAKE-COLOUR.
 
+(declaim (optimize (speed 0) (safety 2) (debug 3)))
 
+#+sbcl (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
 
 
 (defpackage :tcod
@@ -75,6 +77,10 @@
    #:console-get-background-colour
    #:console-get-foreground-color
    #:console-get-background-color
+   #:console-set-alignment
+   #:console-get-alignment
+   #:console-set-background-flag
+   #:console-get-background-flag
    #:console-print
    #:console-print-ex
    #:console-print-rect
@@ -1502,7 +1508,7 @@ value (#xRRGGBB)."
 
 
 (define-c-function ("TCOD_console_get_alignment"
-                    console-set-alignment) alignment
+                    console-get-alignment) alignment
     ((con console))
   (call-it))
 
@@ -1519,7 +1525,7 @@ value (#xRRGGBB)."
 
 (defcfun ("TCOD_console_print_ex" %console-print-ex) :void
   (con console) (x :int) (y :int) (flag background-flag)
-  (alignment align) (fmt :string) &rest)
+  (align alignment) (fmt :string) &rest)
 
 
 (defun* console-print-ex ((con console) (x ucoord) (y ucoord)
@@ -2761,7 +2767,8 @@ the coordinates of the new location."
 
 (defun hello-world ()
   (tcod:console-init-root 80 50 "Libtcod Hello World" nil :renderer-sdl)
-  (tcod:console-print-centre tcod:*root* 40 25 :none "Hello World!")
+  (tcod:console-set-alignment *root* :center)
+  (tcod:console-print tcod:*root* 40 25 "Hello World!")
   (tcod:console-flush)
   (tcod:console-wait-for-keypress t))
 
