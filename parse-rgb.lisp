@@ -16,7 +16,8 @@
 
 (defpackage :parse-rgb
   (:use :cl)
-  (:export #:parse-rgb-file))
+  (:export #:parse-rgb-file
+           #:make-rgb.txt-colours))
 
 (in-package :parse-rgb)
 
@@ -48,7 +49,8 @@ to use all the colours defined in the input file, by name."
 	(format colornames ";;;; This file was generated automatically ~
 by parse-rgb.lisp~%~
 ;;;; Please do not edit directly.~%~
- (in-package :tcod)~%")
+ (in-package :tcod)~%
+ (defun make-rgb.txt-colours ()~%")
 	(labels ((string-to-float (string)
 		   (let ((i (read-from-string string)))
 		     (assert (and (typep i 'integer) (<= i 255)))
@@ -64,10 +66,12 @@ by parse-rgb.lisp~%~
 		      (setf (aref registers 3) (substitute #\- #\space
 							   (aref registers 3))))
 		  (format colornames
-			  "(make-colour :~A ~A ~A ~A)~%"
+			  "  (make-colour :~A ~A ~A ~A)~%"
 			  (string-downcase (aref registers 3))
 			  (string-to-float (aref registers 0))
 			  (string-to-float (aref registers 1))
 			  (string-to-float (aref registers 2))))
 		  (t
-		   (format *error-output* "ignoring line ~A~%" line)))))))))))
+		   (format *error-output* "ignoring line ~A~%" line))))))
+          (format colornames "  )~%")
+          )))))

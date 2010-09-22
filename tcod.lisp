@@ -627,36 +627,7 @@ an already-loaded foreign library.")
 		(setf *libtcod-loaded* t)))
 
 
-;;;; <<Utilities>> ============================================================
-
-
-(defun* (get-bit -> boolean) ((n integer) (pos uint8))
-  "Return the bit at position POS within the integer N (represented as
-a bitfield). POS = 1 refers to the 1's (rightmost) bit."
-  (/= 0 (logand n (expt 2 (1- pos)))))
-
-
-
-(defvar *root* (null-pointer) "The root console.")
-(defparameter +NULL+ (null-pointer) "The null pointer.")
-(defconstant +NOISE-DEFAULT-HURST+ 0.5
-  "Default Hurst exponent for noise functions.")
-(defconstant +NOISE-DEFAULT-LACUNARITY+ 2.0
-  "Default lacunarity for noise functions.")
-
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun simple-type? (sym)
-    "* Arguments
-- SYM :: A symbol.
-* Return Value
-Boolean.
-* Description
-Returns =T= if =SYM= names a non-class type, such as can be
-defined by [[deftype]]."
-    (handler-case (typep t sym)
-      (error () (return-from simple-type? nil)))
-    t))
+;;;; <<Macros>> ===============================================================
 
 
 ;;; The following are some wrapper macros to ease the creation
@@ -754,6 +725,7 @@ name."
   `(progn
      (defctype ,name ,foreign-type)
      (deftype ,name () ',(c-type->lisp-type foreign-type))))
+
 
 
 
@@ -882,20 +854,6 @@ to the structure used by libtcod."
   (rctrl nil :type boolean)
   (shift nil :type boolean))
 
-
-(defun* (make-simple-key -> key) ((ch character))
-  (make-key :vk :char :c ch))
-
-
-(defun* (same-keys? -> boolean) ((key1 key) (key2 key))
-  (and (key-p key1) (key-p key2)
-       (eql (key-vk key1) (key-vk key2))
-       (eql (key-c key1) (key-c key2))
-       (eql (key-shift key1) (key-shift key2))
-       (eql (or (key-lalt key1) (key-ralt key1))
-	    (or (key-lalt key2) (key-ralt key2)))
-       (eql (or (key-lctrl key1) (key-rctrl key1))
-	    (or (key-lctrl key2) (key-rctrl key2)))))
 
 
 
@@ -1084,25 +1042,75 @@ to the structure used by libtcod."
 (define-c-type dijkstra-path :pointer)
 
 
+;;;; <<Utilities>> ============================================================
+
+
+(defun* (get-bit -> boolean) ((n integer) (pos uint8))
+  "Return the bit at position POS within the integer N (represented as
+a bitfield). POS = 1 refers to the 1's (rightmost) bit."
+  (/= 0 (logand n (expt 2 (1- pos)))))
+
+
+
+(defvar *root* (null-pointer) "The root console.")
+(defparameter +NULL+ (null-pointer) "The null pointer.")
+(defconstant +NOISE-DEFAULT-HURST+ 0.5
+  "Default Hurst exponent for noise functions.")
+(defconstant +NOISE-DEFAULT-LACUNARITY+ 2.0
+  "Default lacunarity for noise functions.")
+
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun simple-type? (sym)
+    "* Arguments
+- SYM :: A symbol.
+* Return Value
+Boolean.
+* Description
+Returns =T= if =SYM= names a non-class type, such as can be
+defined by [[deftype]]."
+    (handler-case (typep t sym)
+      (error () (return-from simple-type? nil)))
+    t))
+
+
+
+(defun* (make-simple-key -> key) ((ch character))
+  (make-key :vk :char :c ch))
+
+
+(defun* (same-keys? -> boolean) ((key1 key) (key2 key))
+  (and (key-p key1) (key-p key2)
+       (eql (key-vk key1) (key-vk key2))
+       (eql (key-c key1) (key-c key2))
+       (eql (key-shift key1) (key-shift key2))
+       (eql (or (key-lalt key1) (key-ralt key1))
+	    (or (key-lalt key2) (key-ralt key2)))
+       (eql (or (key-lctrl key1) (key-rctrl key1))
+	    (or (key-lctrl key2) (key-rctrl key2)))))
+
+
+
 ;;;; <<Colours>> ==============================================================
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun* (compose-colour -> uint32) ((r uint8) (g uint8) (b uint8))
     "Given three integer values R, G and B, representing the red, green and
-blue components of a colour, return a 3 byte integer whose value is #xRRGGBB."
-    (+ (ash r 16) (ash g 8) b))
+blue components of a colour, return a 3 byte integer whose value is #xBBGGRR."
+    (+ (ash b 16) (ash g 8) r))
   (declaim (inline compose-color))
   (defun compose-color (r g b) (compose-colour r g b)))
 
 
 (defun* (decompose-colour -> (values uint8 uint8 uint8)) ((num colournum))
-  "Given a colournum #xRRGGBB, return R, G and B integer values
+  "Given a colournum #xBBGGRR, return R, G and B integer values
 as 3 separate return values."
   (values
-	 (ash (logand num #xff0000) -16)
+	 (logand num #x0000ff)
 	 (ash (logand num #x00ff00) -8)
-	 (logand num #x0000ff)))
+	 (ash (logand num #xff0000) -16)
+         ))
 (declaim (inline decompose-color))
 (defun decompose-color (num) (decompose-colour num))
 
@@ -1170,7 +1178,8 @@ as 3 separate return values."
   (setf *colour-table* (make-hash-table :test #'eql))
   (dolist (term *initial-colours*)
     (destructuring-bind (name r g b) term
-      (make-colour name r g b))))
+      (make-colour name r g b)))
+  (make-rgb.txt-colours))
 (defun start-colors () (start-colours))
 
 
