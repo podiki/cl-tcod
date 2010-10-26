@@ -7,7 +7,7 @@
 ;;; Windows users: change the string "libtcod-mingw.dll" to reflect the name
 ;;; of your libtcod library (DLL file).
 ;;;
-;;; Colours are passed to C as integers. There is also a system mapping 
+;;; Colours are passed to C as integers. There is also a system mapping
 ;;; - make a colour from R, G, B values using COMPOSE-COLOUR.
 ;;; - break down a colour into R, G and B values using DECOMPOSE-COLOUR.
 ;;; - to start the colour system call START-COLOURS.
@@ -71,12 +71,10 @@
    #:console-get-fade
    #:console-set-fade
    #:console-get-char
-   #:console-get-fore
-   #:console-get-back
-   #:console-get-foreground-colour
-   #:console-get-background-colour
-   #:console-get-foreground-color
-   #:console-get-background-color
+   #:console-get-default-foreground
+   #:console-get-default-background
+   #:console-set-default-foreground
+   #:console-set-default-background
    #:console-set-alignment
    #:console-get-alignment
    #:console-set-background-flag
@@ -109,15 +107,13 @@
    #:console-put-char
    #:console-put-char-ex
    #:console-set-char
-   #:console-set-fore
-   #:console-set-back
+   #:console-set-char-foreground
+   #:console-set-char-background
+   #:console-get-char-foreground
+   #:console-get-char-background
    #:console-clear
    #:console-fill-char
    #:console-set-dirty
-   #:console-set-foreground-colour
-   #:console-set-background-colour
-   #:console-set-foreground-color
-   #:console-set-background-color
    #:console-init-root
    #:console-is-fullscreen?
    #:console-set-fullscreen
@@ -316,7 +312,7 @@ uncomment the ='(:macintosh...)'= line and change the string on that line to
 the name of the libtcod library file.
 
 * License
-                                               
+
 The CL-TCOD package is placed in the Public Domain by its author.
 
 * Dependencies
@@ -334,7 +330,7 @@ libtcod newer than 1.4.1rc2, which is the first version that includes the
 ='wrappers.c'= and ='wrappers.h'= source files that allow CL-TCOD to interface
 with libtcod.
 
-1. Ensure you have a working common lisp installation. 
+1. Ensure you have a working common lisp installation.
 2. Ensure the ASDF lisp library is installed.
 3. If CFFI or DEFSTAR are not installed, download and install them somewhere ASDF
    can find them. CFFI requires several third-party lisp libraries -- see the
@@ -356,7 +352,7 @@ with libtcod.
    *On Linux*, you can usually put .SO files in =/usr/local/lib/=.
    Use your package installer to install =libSDL=.
    Try running the libtcod demo programs to check everything works.
-   
+
 6. Start lisp. Load ASDF, then CL-TCOD:
 
 ;;;   (load \"/path/to/asdf/asdf.lisp\")
@@ -372,7 +368,7 @@ with libtcod.
 ;;;   (tcod:console-print tcod:*root* 1 1 \"Hello, world!~%\")
 ;;;   (tcod:console-wait-for-keypress t)
 
-                                              
+
 * Differences between CL-TCOD and libtcod
 
 ** Naming conventions
@@ -396,7 +392,7 @@ names all begin with =':'=. THey are named according to the following pattern:
 :  TCOD_CHAR_HLINE  (etc)        <===>  :char-hline
 :  TCOD_COLCTRL_1  (etc)         <===>  :colctrl-1
 :  TCOD_BKGND_SET (etc)          <===>  :set
-:  TCOD_FONT_LAYOUT_ASCII_INCOL  <===>  :font-layout-ascii-in-col 
+:  TCOD_FONT_LAYOUT_ASCII_INCOL  <===>  :font-layout-ascii-in-col
 :  FOV_SHADOW                    <===>  :fov-shadow
 :  TCOD_KEY_PRESSED              <===>  :key-pressed
 :  CENTER                        <===>  :center
@@ -453,7 +449,7 @@ names. If you are using [[http://www.gnu.org/software/emacs/][GNU Emacs]], the
 king of lisp IDEs, do =M-x list-colors-display= to see a list of all colours.
 
 ** Lisp =format= versus C =printf=
-   
+
 The TCOD functions that accept =printf=-like string-formatting arguments,
 have been modified to instead accept arguments to Common Lisp's =format=
 function.'  For example:
@@ -472,7 +468,7 @@ becomes:
   but draws using `double-line' characters:
 
 ;;;  (tcod:console-print-double-frame CONSOLE X Y W H EMPTY? STRING...)
-  
+
 
 * Resources
 
@@ -510,7 +506,7 @@ Lisp editors and IDEs:
 - [[http://www.gnu.org/software/emacs/][GNU Emacs]] (the best; see below)
   - [[http://common-lisp.net/project/slime/][SLIME]] is the Emacs interface to
     Common Lisp.
-- [[http://bitfauna.com/projects/cusp/][Cusp]], a common lisp plugin for Eclipse. 
+- [[http://bitfauna.com/projects/cusp/][Cusp]], a common lisp plugin for Eclipse.
 - The [[http://www.franz.com/products/allegrocl/][Allegro]] and
   [[http://www.lispworks.com/][LispWorks]] lisp implementations each have a
   builtin IDE.
@@ -606,8 +602,8 @@ Help & advice with lisp:
 
 ;;;; <<Library>> ==============================================================
 
- 
- 
+
+
 (define-foreign-library libtcod
 	(:unix #+libtcod-debug "libtcod-debug.so"
                #-libtcod-debug "libtcod.so")
@@ -749,7 +745,7 @@ name."
 
 ;; TCOD_color_t
 ;; This is seldom used -- colournums are used instead (see above).
-(defcstruct colour  
+(defcstruct colour
 	(r :uint8)
 	(g :uint8)
 	(b :uint8))
@@ -860,35 +856,35 @@ to the structure used by libtcod."
 (define-c-enum drawing-character
 	(:CHAR-HLINE 196)
 	(:CHAR-VLINE 179)
-	(:CHAR-NE 191) 
-	(:CHAR-NW 218) 
-	(:CHAR-SE 217) 
+	(:CHAR-NE 191)
+	(:CHAR-NW 218)
+	(:CHAR-SE 217)
 	(:CHAR-SW 192)
-	(:CHAR-TEEW 180) 
-	(:CHAR-TEEE 195) 
+	(:CHAR-TEEW 180)
+	(:CHAR-TEEE 195)
 	(:CHAR-TEEN 193)
 	(:CHAR-TEES 194)
 	(:CHAR-CROSS 197)
 	;; Double walls
 	(:CHAR-DHLINE 205)
 	(:CHAR-DVLINE 186)
-	(:CHAR-DNE 187) 
-	(:CHAR-DNW 201) 
-	(:CHAR-DSE 188) 
+	(:CHAR-DNE 187)
+	(:CHAR-DNW 201)
+	(:CHAR-DSE 188)
 	(:CHAR-DSW 200)
-	(:CHAR-DTEEW 181) 
-	(:CHAR-DTEEE 198) 
+	(:CHAR-DTEEW 181)
+	(:CHAR-DTEEE 198)
 	(:CHAR-DTEEN 208)
 	(:CHAR-DTEES 210)
 	(:CHAR-DCROSS 206)
 	;; Blocks
-	(:CHAR-BLOCK1 178) 
-	(:CHAR-BLOCK2 177) 
+	(:CHAR-BLOCK1 178)
+	(:CHAR-BLOCK2 177)
 	(:CHAR-BLOCK3 176)
 	;; Arrows
-	(:CHAR-ARROW-N 24) 
-	(:CHAR-ARROW-S 25) 
-	(:CHAR-ARROW-E 26) 
+	(:CHAR-ARROW-N 24)
+	(:CHAR-ARROW-S 25)
+	(:CHAR-ARROW-E 26)
 	(:CHAR-ARROW_W 27)
 	;; Arrows without tail
 	(:CHAR-ARROW2-N 30)
@@ -992,13 +988,13 @@ to the structure used by libtcod."
 
 ;; TCOD_mouse_t
 (defcstruct mouse-state
-	(x :int)	
-	(y :int)	
-	(dx :int)	
+	(x :int)
+	(y :int)
+	(dx :int)
 	(dy :int)
-	(cx :int)	
+	(cx :int)
 	(cy :int)
-	(dcx :int)	
+	(dcx :int)
 	(dcy :int)
         (lbutton :boolean)
         (rbutton :boolean)
@@ -1012,10 +1008,10 @@ to the structure used by libtcod."
 (defstruct mouse
   "Structure used by CL-TCOD to represent mouse status."
   (x 0 :type uint16) ;; absolute position
-  (y 0 :type uint16)	
+  (y 0 :type uint16)
   (dx 0 :type sint16) ;; movement since last update in pixels
   (dy 0 :type sint16)
-  (cx 0 :type uint16) ;; cell coordinates in the root console 
+  (cx 0 :type uint16) ;; cell coordinates in the root console
   (cy 0 :type uint16)
   (dcx 0 :type sint16)	;; movement since last update in console cells
   (dcy 0 :type sint16)
@@ -1158,7 +1154,7 @@ as 3 separate return values."
     (:chocolate 	210 105 30)))
 
 
-;;#define TCOD_BKGND_ALPHA(alpha) 
+;;#define TCOD_BKGND_ALPHA(alpha)
 ;;    ((TCOD_bkgnd_flag_t)(TCOD_BKGND_ALPH|(((uint8)(alpha*255))<<8)))
 (defun background-alpha (alpha)
   (foreign-enum-keyword 'background-flag
@@ -1166,7 +1162,7 @@ as 3 separate return values."
 				(ash (mod (* alpha 255) 256) 8))))
 
 ;;
-;;#define TCOD_BKGND_ADDALPHA(alpha) 
+;;#define TCOD_BKGND_ADDALPHA(alpha)
 ;;    ((TCOD_bkgnd_flag_t)(TCOD_BKGND_ADDA|(((uint8)(alpha*255))<<8)))
 (defun background-add-alpha (alpha)
   (foreign-enum-keyword 'background-flag
@@ -1196,7 +1192,7 @@ as 3 separate return values."
     (let ((brightness (round (+ r g b) 3)))
       (compose-colour brightness brightness brightness))))
 (defun color->grayscale (col) (colour->grayscale col))
-  
+
 
 (defun* (colour -> colournum) ((keywd (or colournum symbol)))
   "Given a colour keyword such as :GREY, return its corresponding RGB
@@ -1217,7 +1213,7 @@ value (#xRRGGBB)."
 
 
 
-;; TCODLIB_API bool TCOD_color_equals (TCOD_color_t c1, TCOD_color_t c2); 
+;; TCODLIB_API bool TCOD_color_equals (TCOD_color_t c1, TCOD_color_t c2);
 (define-c-function ("TCOD_color_equals_wrapper" colour-equals?) :boolean
 	((c1 colournum) (c2 colournum)))
 (declaim (inline color-equals?))
@@ -1234,7 +1230,7 @@ value (#xRRGGBB)."
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_color_multiply (TCOD_color_t c1,
-;; TCOD_color_t c2); 
+;; TCOD_color_t c2);
 (define-c-function ("TCOD_color_multiply_wrapper" colour-multiply) colournum
 	((c1 colournum) (c2 colournum)))
 (declaim (inline color-multiply))
@@ -1340,7 +1336,7 @@ value (#xRRGGBB)."
   (setf (gethash *root* *console-height-table*) height)
   (call-it))
 
-                          
+
 ;;TCODLIB_API void TCOD_console_set_custom_font(const char *fontFile,
 ;;                        int char_width, int char_height, int nb_char_horiz,
 ;;                        int nb_char_vertic, bool chars_by_row,
@@ -1392,22 +1388,33 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API void TCOD_console_set_background_color(TCOD_console_t con,
 ;; TCOD_color_t col);
-(define-c-function ("TCOD_console_set_background_color_wrapper"
-	  console-set-background-color) :void
+(define-c-function ("TCOD_console_set_default_background_wrapper"
+	  console-set-default-background) :void
 	((con console) (col colournum)))
-(declaim (inline console-set-background-colour))
-(defun console-set-background-colour (con col)
-  (console-set-background-color con col))
+(declaim (inline console-set-default-background))
 
 
 ;;TCODLIB_API void TCOD_console_set_foreground_color(TCOD_console_t con,
 ;;                                                   TCOD_color_t col);
-(define-c-function ("TCOD_console_set_foreground_color_wrapper"
-	  console-set-foreground-color) :void
+(define-c-function ("TCOD_console_set_default_foreground_wrapper"
+	  console-set-default-foreground) :void
 	((con console) (col colournum)))
-(declaim (inline console-set-foreground-colour))
-(defun console-set-foreground-colour (con col)
-  (console-set-foreground-color con col))
+(declaim (inline console-set-default-foreground))
+
+
+;;TCODLIB_API TCOD_color_t TCOD_console_get_background_color(TCOD_console_t
+;;con);
+(define-c-function ("TCOD_console_get_default_background_wrapper"
+                    console-get-default-background) colournum
+  ((con console)))
+(declaim (inline console-get-default-background))
+
+
+;;TCODLIB_API TCOD_color_t TCOD_console_get_foreground_color(TCOD_console_t con);
+(define-c-function ("TCOD_console_get_default_foreground_wrapper"
+                    console-get-default-foreground) colournum
+  ((con console)))
+(declaim (inline console-get-default-foreground))
 
 
 ;;TCODLIB_API void TCOD_console_clear(TCOD_console_t con);
@@ -1426,10 +1433,28 @@ value (#xRRGGBB)."
   (call-it))
 
 
+;;TCODLIB_API TCOD_color_t TCOD_console_get_back(TCOD_console_t con,int x, int y)
+(define-c-function ("TCOD_console_get_char_background_wrapper"
+                    console-get-char-background) colournum
+  ((con console) (x :int) (y :int))
+  (assert (legal-console-coordinates? con x y))
+  (call-it))
+
+
+;;TCODLIB_API TCOD_color_t TCOD_console_get_fore(TCOD_console_t con,
+;;                                               int x, int y);
+(define-c-function ("TCOD_console_get_char_foreground_wrapper"
+                    console-get-char-foreground) colournum
+  ((con console) (x :int) (y :int))
+  (assert (legal-console-coordinates? con x y))
+  (call-it))
+
+
 ;;TCODLIB_API void TCOD_console_set_back(TCOD_console_t con,int x, int y,
 ;;                                       TCOD_color_t col,
 ;;                                       TCOD_bkgnd_flag_t flag);
-(define-c-function ("TCOD_console_set_back_wrapper" console-set-back) :void
+(define-c-function ("TCOD_console_set_char_background_wrapper"
+                    console-set-char-background) :void
     ((con console) (x :int) (y :int) (col colournum) (flag background-flag))
   (assert (legal-console-coordinates? con x y))
   (call-it con x y col flag))
@@ -1437,7 +1462,8 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API void TCOD_console_set_fore(TCOD_console_t con,int x, int y,
 ;;                                       TCOD_color_t col);
-(define-c-function ("TCOD_console_set_fore_wrapper" console-set-fore) :void
+(define-c-function ("TCOD_console_set_char_foreground_wrapper"
+                    console-set-char-foreground) :void
     ((con console) (x :int) (y :int) (col colournum))
   (assert (legal-console-coordinates? con x y))
   (call-it con x y col))
@@ -1490,7 +1516,7 @@ value (#xRRGGBB)."
 ;; (defcfun ("TCOD_console_print_left" %console-print-left) :void
 ;;   (con console) (x :int) (y :int) (flag background-flag) (fmt :string)
 ;;   &rest)
-;; 
+;;
 ;; (defun* console-print-left ((con console) (x ucoord) (y ucoord)
 ;;                             (flag background-flag) (fmt string)
 ;;                             &rest args)
@@ -1556,40 +1582,40 @@ value (#xRRGGBB)."
 
 
 ;;TCODLIB_API void TCOD_console_print_right(TCOD_console_t con,int x, int y,
-;; TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
+;; TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_right" %console-print-right) :void
 ;; 	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-print-right ((con console) (x ucoord) (y ucoord)
 ;;                              (flag background-flag) (fmt string) &rest args)
 ;;   (assert (legal-console-coordinates? con x y))
 ;;   (%console-print-right con x y flag (apply #'format nil fmt args)))
 
 ;;TCODLIB_API void TCOD_console_print_center(TCOD_console_t con,int x, int y,
-;; TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
+;; TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_center" %console-print-centre) :void
 ;; 	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-print-centre ((con console) (x ucoord) (y ucoord)
 ;;                               (flag background-flag) (fmt string)
 ;;                               &rest args)
 ;;   (assert (legal-console-coordinates? con x y))
 ;;   (%console-print-centre con x y flag (apply #'format nil fmt args)))
-;; 
+;;
 ;; (declaim (inline console-print-center))
 ;; (defun console-print-center (con x y flag fmt &rest args)
 ;;   (apply #'console-print-centre con x y flag fmt args))
 
 
 ;;TCODLIB_API int TCOD_console_print_left_rect(TCOD_console_t con,int x, int y,
-;; int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
+;; int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_left_rect" %console-print-left-rect) :int
 ;; 	(con console) (x :int) (y :int) (w :int) (h :int)
 ;; 	(flag background-flag) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-print-left-rect ((con console) (x ucoord) (y ucoord)
 ;;                                  (w ucoord) (h ucoord)
 ;;                                  (flag background-flag) (fmt string) &rest args)
@@ -1598,12 +1624,12 @@ value (#xRRGGBB)."
 ;;                             (apply #'format nil fmt args)))
 
 ;;TCODLIB_API int TCOD_console_print_right_rect(TCOD_console_t con,int x,
-;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
+;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_right_rect" %console-print-right-rect) :int
 ;; 	(con console) (x :int) (y :int) (w :int) (h :int)
 ;; 	(flag background-flag) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-print-right-rect ((con console) (x ucoord) (y ucoord)
 ;;                                   (w ucoord) (h ucoord)
 ;;                                   (flag background-flag) (fmt string) &rest args)
@@ -1637,19 +1663,19 @@ value (#xRRGGBB)."
 
 
 ;;TCODLIB_API int TCOD_console_print_center_rect(TCOD_console_t con,int x,
-;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...); 
+;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_center_rect" %console-print-centre-rect) :int
 ;; 	(con console) (x :int) (y :int) (w :int) (h :int)
 ;; 	(flag background-flag) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-print-centre-rect ((con console) (x ucoord) (y ucoord)
 ;;                                    (w ucoord) (h ucoord)
 ;;                                    (flag background-flag) (fmt string) &rest args)
 ;;   (assert (legal-console-coordinates? con x y))
 ;;   (%console-print-centre-rect con x y w h flag
 ;;                               (apply #'format nil fmt args)))
-;; 
+;;
 ;; (declaim (inline console-print-center-rect))
 ;; (defun console-print-center-rect (con x y w h flag fmt &rest args)
 ;;   (apply #'console-print-centre-rect con x y w h flag fmt args))
@@ -1683,7 +1709,7 @@ value (#xRRGGBB)."
 ;; (defcfun ("TCOD_console_height_left_rect" %console-height-left-rect) :int
 ;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-height-left-rect ((con console) (x ucoord) (y ucoord)
 ;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
 ;;   (assert (legal-console-coordinates? con x y))
@@ -1695,7 +1721,7 @@ value (#xRRGGBB)."
 ;; (defcfun ("TCOD_console_height_right_rect" %console-height-right-rect) :int
 ;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-height-right-rect ((con console) (x ucoord) (y ucoord)
 ;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
 ;;   (assert (legal-console-coordinates? con x y))
@@ -1707,12 +1733,12 @@ value (#xRRGGBB)."
 ;; (defcfun ("TCOD_console_height_center_rect" %console-height-centre-rect) :int
 ;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
 ;; 	&rest)
-;; 
+;;
 ;; (defun* console-height-centre-rect ((con console) (x ucoord) (y ucoord)
 ;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
 ;;   (assert (legal-console-coordinates? con x y))
 ;;   (%console-height-centre-rect con x y w h (apply #'format nil fmt args)))
-;; 
+;;
 ;; (declaim (inline console-height-center-rect))
 ;; (defun console-height-center-rect (con x y w h fmt &rest args)
 ;;   (apply #'console-height-centre-rect con x y w h fmt args))
@@ -1741,7 +1767,7 @@ value (#xRRGGBB)."
 ;;#-libtcod-old
 (defcfun ("TCOD_console_print_frame" %console-print-frame) :void
   (con console) (x :int) (y :int) (width :int) (height :int)
-  (empty? :boolean) (flag background-flag) 
+  (empty? :boolean) (flag background-flag)
   (fmt :string) &rest)
 
 (defun* console-print-frame ((con console) (x ucoord) (y ucoord)
@@ -1753,12 +1779,12 @@ value (#xRRGGBB)."
   (check-type height ucoord)
   (%console-print-frame con x y width height empty? flag
                         (apply #'format nil fmt args)))
-  
+
 
 ;; Added in wrappers.c
 (defcfun ("TCOD_console_print_double_frame" %console-print-double-frame) :void
   (con console) (x :int) (y :int) (width :int) (height :int)
-  (empty? :boolean) (flag background-flag) 
+  (empty? :boolean) (flag background-flag)
   (fmt :string) &rest)
 
 (defun* console-print-double-frame ((con console) (x ucoord) (y ucoord)
@@ -1772,41 +1798,7 @@ value (#xRRGGBB)."
                                (apply #'format nil fmt args)))
 
 
-  
-;;TCODLIB_API TCOD_color_t TCOD_console_get_background_color(TCOD_console_t
-;;con);
-(define-c-function ("TCOD_console_get_background_color_wrapper"
-                    console-get-background-color) colournum
-  ((con console)))
-(declaim (inline console-get-background-colour))
-(defun* (console-get-background-colour -> colournum) ((con console))
-  (console-get-background-color con))
 
-
-;;TCODLIB_API TCOD_color_t TCOD_console_get_foreground_color(TCOD_console_t con);
-(define-c-function ("TCOD_console_get_foreground_color_wrapper"
-                    console-get-foreground-color) colournum
-  ((con console)))
-(declaim (inline console-get-foreground-colour))
-(defun* (console-get-foreground-colour -> colournum) ((con console))
-  (console-get-foreground-color con))
-
-
-;;TCODLIB_API TCOD_color_t TCOD_console_get_back(TCOD_console_t con,int x, int y)
-(define-c-function ("TCOD_console_get_back_wrapper" console-get-back) colournum
-  ((con console) (x :int) (y :int))
-  (assert (legal-console-coordinates? con x y))
-  (call-it))
-
-
-;;TCODLIB_API TCOD_color_t TCOD_console_get_fore(TCOD_console_t con,
-;;                                               int x, int y);
-(define-c-function ("TCOD_console_get_fore_wrapper" console-get-fore) colournum
-  ((con console) (x :int) (y :int))
-  (assert (legal-console-coordinates? con x y))
-  (call-it))
-
-  
 ;;TCODLIB_API int TCOD_console_get_char(TCOD_console_t con,int x, int y);
 (define-c-function ("TCOD_console_get_char" console-get-char) :int
   ((con console) (x :int) (y :int))
@@ -1921,8 +1913,8 @@ value (#xRRGGBB)."
                  (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
     (call-it src xsrc ysrc wsrc hsrc dest xdest ydest
              foreground-alpha background-alpha)))
-    
-  
+
+
 
 
 ;; (defun* console-blit ((src console)
@@ -2177,7 +2169,7 @@ value (#xRRGGBB)."
               :rbutton-pressed (foreign-slot-value ms 'mouse-state 'rbutton-pressed)
               :mbutton-pressed (foreign-slot-value ms 'mouse-state 'mbutton-pressed)))
 
-	      
+
 
 ;;TCODLIB_API TCOD_mouse_t TCOD_mouse_get_status();
 (defcfun ("TCOD_mouse_get_status_wrapper" %mouse-get-status) :void
@@ -2277,7 +2269,7 @@ in =IMAGE=.")
   "Set the colour of the pixel at =(PIXEL-X, PIXEL-Y)= in =IMAGE= to =COLOUR=.")
 
 ;;TCODLIB_API void TCOD_image_blit(TCOD_image_t image, TCOD_console_t console,
-;; float x, float y, 
+;; float x, float y,
 ;;	TCOD_bkgnd_flag_t bkgnd_flag, float scalex, float scaley, float angle);
 (define-c-function ("TCOD_image_blit" image-blit) :void
     ((image image) (con console) (x :int) (y :int) (flag background-flag)
@@ -2287,7 +2279,7 @@ in =IMAGE=.")
 
 
 ;;TCODLIB_API void TCOD_image_blit_rect(TCOD_image_t image,
-;; TCOD_console_t console, int x, int y, int w, int h, 
+;; TCOD_console_t console, int x, int y, int w, int h,
 ;;	TCOD_bkgnd_flag_t bkgnd_flag);
 (define-c-function ("TCOD_image_blit_rect" image-blit-rect) :void
     ((image image) (con console) (x :int) (y :int) (width :int) (height :int)
@@ -2398,21 +2390,21 @@ object was created."
   "Return a new heightmap with the given dimensions.")
 
 
-(define-c-function ("TCOD_heightmap_get_value" heightmap-get-value) :float 
+(define-c-function ("TCOD_heightmap_get_value" heightmap-get-value) :float
   ;; 0 <= x < WIDTH
   ((heightmap heightmap) (x :int) (y :int))
   "Return the height at position =(X, Y)= in the heightmap.")
 
 
 (define-c-function ("TCOD_heightmap_get_interpolated_value"
-          heightmap-get-interpolated-value) :float 
+          heightmap-get-interpolated-value) :float
   ;; 0 <= x < WIDTH
   ((heightmap heightmap) (x :float) (y :float))
   "Calculate the height at position =(X, Y)= in the heightmap, where the
 coordinates might not be integers.")
 
 
-(define-c-function ("TCOD_heightmap_get_slope" heightmap-get-slope) :float 
+(define-c-function ("TCOD_heightmap_get_slope" heightmap-get-slope) :float
   ((heightmap heightmap) (x :int) (y :int))
   "Return the slope at position =(X, Y)= in the heightmap. The value returned
 will be between 0 and pi/2.")
