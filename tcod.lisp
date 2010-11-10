@@ -207,11 +207,14 @@
    #:random-get-float
    ;; [[Noise]] ===============================================================
    #:noise-new
-   #:noise-perlin
-   #:noise-simplex
-   #:noise-fbm-perlin
-   #:noise-turbulence-perlin
    #:noise-delete
+   #:noise-set-type
+   #:noise-get
+   #:noise-get-ex
+   #:noise-get-fbm
+   #:noise-get-fbm-ex
+   #:noise-get-turbulence
+   #:noise-get-turbulence-ex
    ;; [[Heightmap]] ===========================================================
    #:heightmap
    #:heightmap-new
@@ -955,6 +958,12 @@ to the structure used by libtcod."
 	(:FONT-TYPE-GREYSCALE 4)
 	(:FONT-LAYOUT-TCOD 8))
 
+
+(define-c-enum noise-type
+    (:NOISE-DEFAULT 0)
+  (:NOISE-PERLIN 1)
+  (:NOISE-SIMPLEX 2)
+  (:NOISE-WAVELET 4))
 
 
 (define-c-enum rng-algorithm
@@ -2320,65 +2329,92 @@ in =IMAGE=.")
   (%noise-new dimensions hurst lacunarity rng))
 
 
-;; // basic perlin noise
-;; TCODLIB_API float TCOD_noise_get( TCOD_noise_t noise, float *f );
-(defcfun ("TCOD_noise_perlin" %noise-perlin) :float
-  (noise noise) (f :pointer))
-
-(defun* (noise-perlin -> float) ((noise noise) &rest nums)
-  "Returns the value of the Perlin noise function at the given coordinates."
-  (with-foreign-object (f :float (length nums))
-    (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
-    (%noise-perlin noise f)))
-
-
-;; simplex noise
-(defcfun ("TCOD_noise_simplex" %noise-simplex) :float
-  (noise noise) (f :pointer))
-
-(defun* (noise-simplex -> float) ((noise noise) &rest nums)
-  "Returns the value of the simplex noise function at the given coordinates."
-  (with-foreign-object (f :float (length nums))
-    (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
-    (%noise-simplex noise f)))
-
-
-;; // fractional brownian motion
-;; TCODLIB_API float TCOD_noise_fbm( TCOD_noise_t noise, float *f,
-;; float octaves );
-(defcfun ("TCOD_noise_fbm_perlin" %noise-fbm-perlin) :float
-  (noise noise) (f :pointer) (octaves :float))
-
-(defun* (noise-fbm-perlin -> float) ((noise noise) (octaves float) &rest nums)
-  "Returns the value of the fractal Brownian motion noise function at the given
-coordinates, using the Hurst and lacunarity values given when the noise
-object was created."
-  (with-foreign-object (f :float (length nums))
-    (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
-    (%noise-fbm-perlin noise f octaves)))
-
-;; // turbulence
-;; TCODLIB_API float TCOD_noise_turbulence( TCOD_noise_t noise,
-;;   float *f, float octaves );
-(defcfun ("TCOD_noise_turbulence_perlin" %noise-turbulence-perlin) :float
-  (noise noise) (f :pointer) (octaves :float))
-
-(defun* (noise-turbulence-perlin -> float) ((noise noise) (octaves float)
-                                            &rest nums)
-  "Returns the value of the turbulence noise function at the given coordinates."
-  (with-foreign-object (f :float (length nums))
-    (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
-    (%noise-turbulence-perlin noise f octaves)))
-
-
 ;; TCODLIB_API void TCOD_noise_delete(TCOD_noise_t noise);
 (define-c-function ("TCOD_noise_delete" noise-delete) :void
   ((noise noise))
   "Destroy a noise object.")
+
+
+(define-c-function ("TCOD_noise_set_type" noise-set-type) :void
+  ((noise noise) (noise-type noise-type))
+  "Set the type of noise produced by a noise object.")
+
+;;; noise-get =================================================================
+
+(defcfun ("TCOD_noise_get" %noise-get) :float
+  (noise noise) (f :pointer))
+
+(defun* (noise-get -> float) ((noise noise) &rest nums)
+  "Returns the flat noise function at the given coordinates."
+  (with-foreign-object (f :float (length nums))
+    (dotimes (i (length nums))
+      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+    (%noise-get noise f)))
+
+(defcfun ("TCOD_noise_get_ex" %noise-get-ex) :float
+  (noise noise) (f :pointer) (noise-type noise-type))
+
+(defun* (noise-get-ex -> float) ((noise noise) (noise-type noise-type)
+                                 &rest nums)
+  "Returns the flat noise function at the given coordinates,
+using noise type NOISE-TYPE."
+  (with-foreign-object (f :float (length nums))
+    (dotimes (i (length nums))
+      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+    (%noise-get-ex noise f noise-type)))
+
+;;; noise-get-FBM =============================================================
+
+(defcfun ("TCOD_noise_get_fbm" %noise-get-fbm) :float
+  (noise noise) (f :pointer) (octaves :float))
+
+(defun* (noise-get-fbm -> float) ((noise noise) (octaves float) &rest nums)
+  "Returns the fractional Brownian motion function at the given coordinates."
+  (with-foreign-object (f :float (length nums))
+    (dotimes (i (length nums))
+      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+    (%noise-get-fbm noise f octaves)))
+
+(defcfun ("TCOD_noise_get_fbm_ex" %noise-get-fbm-ex) :float
+  (noise noise) (f :pointer) (octaves :float) (noise-type noise-type))
+
+(defun* (noise-get-fbm-ex -> float) ((noise noise) (noise-type noise-type)
+                                     (octaves float) &rest nums)
+  "Returns the fractional Brownian motion function at the given coordinates,
+using noise type NOISE-TYPE."
+  (with-foreign-object (f :float (length nums))
+    (dotimes (i (length nums))
+      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+    (%noise-get-fbm-ex noise f octaves noise-type)))
+
+
+;;; noise-get-turbulence ======================================================
+
+
+(defcfun ("TCOD_noise_get_turbulence" %noise-get-turbulence) :float
+  (noise noise) (f :pointer) (octaves :float))
+
+(defun* (noise-get-turbulence -> float) ((noise noise) (octaves float)
+                                         &rest nums)
+  "Returns the turbulence function at the given coordinates."
+  (with-foreign-object (f :float (length nums))
+    (dotimes (i (length nums))
+      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+    (%noise-get-turbulence noise f octaves)))
+
+(defcfun ("TCOD_noise_get_turbulence_ex" %noise-get-turbulence-ex) :float
+  (noise noise) (f :pointer) (octaves :float) (noise-type noise-type))
+
+(defun* (noise-get-turbulence-ex -> float) ((noise noise)
+                                            (noise-type noise-type)
+                                            (octaves float) &rest nums)
+  "Returns the turbulence function at the given coordinates,
+using noise type NOISE-TYPE."
+  (with-foreign-object (f :float (length nums))
+    (dotimes (i (length nums))
+      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+    (%noise-get-turbulence-ex noise f octaves noise-type)))
+
 
 
 ;;;; <<Heightmap>> ============================================================
