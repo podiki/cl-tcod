@@ -1480,12 +1480,15 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API void TCOD_console_set_char(TCOD_console_t con,int x, int y,
 ;; int c);
-(define-c-function ("TCOD_console_set_char" console-set-char) :void
-    ((con console) (x :int) (y :int) (ch :unsigned-char))
+(defcfun ("TCOD_console_set_char" %console-set-char) :void
+    (con console) (x :int) (y :int) (ch :unsigned-char))
+
+
+(defun* console-set-char ((con console) (x integer) (y integer) ch)
   (assert (legal-console-coordinates? con x y))
   (when (characterp ch)
     (setf ch (char-code ch)))
-  (call-it con x y ch))
+  (%console-set-char con x y ch))
 
 
 (defun* (console-fill-char -> null)  ((con console) (ch (or character uchar))
