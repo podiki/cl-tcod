@@ -19,6 +19,7 @@
 
 
 (defpackage :tcod
+  (:nicknames :cl-tcod)
   (:use :cl :cffi :defstar)
   (:export
    #:*root*
@@ -32,6 +33,10 @@
    #:compose-color
    #:decompose-colour
    #:decompose-color
+   #:colour-rgb
+   #:color-rgb
+   #:colour-hsv
+   #:color-hsv
    #:invert-colour
    #:invert-color
    #:colour->grayscale
@@ -41,8 +46,13 @@
    #:colour-get-hue
    #:colour-get-saturation
    #:colour-get-value
+   #:colour-set-hue
+   #:colour-set-saturation
+   #:colour-set-value
+   #:colour-shift-hue
    #:colour-equals?
    #:colour-add
+   #:colour-subtract
    #:colour-multiply
    #:colour-multiply-scalar
    #:colour-lerp
@@ -52,8 +62,13 @@
    #:color-get-hue
    #:color-get-saturation
    #:color-get-value
+   #:color-set-hue
+   #:color-set-saturation
+   #:color-set-value
+   #:color-shift-hue
    #:color-equals?
    #:color-add
+   #:color-subtract
    #:color-multiply
    #:color-multiply-scalar
    #:color-lerp
@@ -61,81 +76,78 @@
    #:background-alpha
    #:background-add-alpha
    ;; [[Console]] ==========================================================
-   #:console-wait-for-keypress
-   #:console-check-for-keypress
-   #:console-set-colour-control
-   #:console-set-color-control
-   #:console-flush
-   #:console-get-fading-colour
-   #:console-get-fading-color
-   #:console-get-fade
-   #:console-set-fade
-   #:console-get-char
-   #:console-get-default-foreground
-   #:console-get-default-background
+   #:console-init-root
+   #:console-set-window-title
+   #:console-is-fullscreen?
+   #:console-set-fullscreen
+   #:console-is-window-closed?
+   #:console-set-custom-font
+   #:console-map-ascii-code-to-font
+   #:console-map-ascii-codes-to-font
+   #:console-map-string-to-font
+   #:console-set-dirty
    #:console-set-default-foreground
    #:console-set-default-background
-   #:console-set-alignment
-   #:console-get-alignment
+   #:console-set-char-foreground
+   #:console-set-char-background
+   #:console-set-char
+   #:console-put-char
+   #:console-put-char-ex
    #:console-set-background-flag
    #:console-get-background-flag
+   #:console-set-alignment
+   #:console-get-alignment
    #:console-print
    #:console-print-ex
    #:console-print-rect
    #:console-print-rect-ex
-   ;; #:console-print-left
-   ;; #:console-print-right
-   ;; #:console-print-centre
-   ;; #:console-print-center
-   ;; #:console-print-left-rect
-   ;; #:console-print-right-rect
-   ;; #:console-print-centre-rect
-   ;; #:console-print-center-rect
+   #:console-get-height-rect
+   #:console-rect
    #:console-hline
    #:console-vline
    #:console-print-frame
    #:console-print-double-frame
-   #:console-map-ascii-code-to-font
-   #:console-map-ascii-codes-to-font
-   #:console-map-string-to-font
-   #:console-get-height-rect
-   ;; #:console-height-left-rect
-   ;; #:console-height-right-rect
-   ;; #:console-height-centre-rect
-   ;; #:console-height-center-rect
-   #:legal-console-coordinates?
-   #:console-put-char
-   #:console-put-char-ex
-   #:console-set-char
-   #:console-set-char-foreground
-   #:console-set-char-background
+   #:console-get-default-foreground
+   #:console-get-default-background
    #:console-get-char-foreground
    #:console-get-char-background
+   #:console-get-char
+   #:console-set-fade
+   #:console-get-fade
+   #:console-get-fading-colour
+   #:console-flush
+   #:console-set-colour-control
+   #:console-new
+   #:console-get-height
+   #:console-get-width
+   #:console-set-color-control
+   #:console-get-fading-color
    #:console-clear
-   #:console-fill-char
-   #:console-set-dirty
-   #:console-init-root
-   #:console-is-fullscreen?
-   #:console-set-fullscreen
-   #:console-is-window-closed?
+   #:console-blit
+   #:console-delete
    #:console-credits
    #:console-credits-reset
-   #:console-credits-render
-   #:console-set-custom-font
-   #:console-set-window-title
-   #:console-rect
+   #:console-credits-renderer
+   #:legal-console-coordinates?
+   #:console-fill-char
+   #:console-set-key-colour
+   #:console-set-key-color
    #:drawing-character
    #:colctrl
    #:colctrl->char
    #:background-flag
    #:console
-   #:console-new
-   #:console-delete
-   #:console-get-width
-   #:console-get-height
-   #:console-blit
+   ;; [[Unicode]] =============================================================
+   #:console-map-string-to-font-utf
+   #:console-print-utf
+   #:console-print-ex-utf
+   #:console-print-rect-utf
+   #:console-print-rect-ex-utf
+   #:console-get-rect-height-utf
    ;; [[Keyboard input]] ======================================================
    #:key
+   #:console-check-for-keypress
+   #:console-wait-for-keypress
    #:keycode
    #:key-p
    #:key-c
@@ -153,8 +165,6 @@
    #:is-key-pressed?
    #:console-set-keyboard-repeat
    #:console-disable-keyboard-repeat
-   ;; == Unicode ==
-   ;; todo not yet implemented
    ;; [[Mouse]] ===============================================================
    #:mouse
    #:make-mouse
@@ -172,6 +182,8 @@
    #:mouse-rbutton-pressed
    #:mouse-move
    #:mouse-get-status
+   #:mouse-is-cursor-visible?
+   #:mouse-show-cursor
    #:mouse-get-x
    #:mouse-get-y
    #:mouse-get-cx
@@ -188,82 +200,116 @@
    #:mouse-get-rbutton-pressed
    ;; [[Image]] ===============================================================
    #:image-new
-   #:image-load
-   #:image-save
    #:image-from-console
+   #:image-refresh-console
+   #:image-load
    #:image-clear
+   #:image-invert
+   #:image-hflip
+   #:image-vflip
+   #:image-rotate90
+   #:image-scale
+   #:image-save
+   #:image-get-width                    ; these replace image-get-size
+   #:image-get-height
+   #:image-get-pixel
+   #:image-get-alpha
+   #:image-get-mipmap-pixel
    #:image-put-pixel
    #:image-blit
    #:image-blit-rect
-   #:image-set-key-color
+   #:image-blit-2x
+   #:image-delete
    #:image-set-key-colour
-   #:image-get-pixel
-   #:image-get-mipmap-pixel
+   #:image-set-key-color
+   #:image-is-pixel-transparent?
    ;; [[Random]] ==============================================================
    #:random-new
    #:random-get-instance
+   #:random-save
+   #:random-restore
+   #:random-new-from-seed
+   #:random-set-distribution
    #:random-delete
    #:random-get-int
    #:random-get-float
+   #:random-get-double
+   #:random-get-int-mean
+   #:random-get-float-mean
+   #:random-get-double-mean
+   #:random-dice-new ;; not yet mentioned in libtcod docs
+   #:random-dice-roll ;;
+   #:random-dice-roll-s ;;
    ;; [[Noise]] ===============================================================
    #:noise-new
    #:noise-delete
    #:noise-set-type
-   #:noise-get
    #:noise-get-ex
-   #:noise-get-fbm
    #:noise-get-fbm-ex
-   #:noise-get-turbulence
    #:noise-get-turbulence-ex
+   #:noise-get
+   #:noise-get-fbm
+   #:noise-get-turbulence
    ;; [[Heightmap]] ===========================================================
    #:heightmap
    #:heightmap-new
+   #:heightmap-delete
+   #:heightmap-set-value
+   #:heightmap-add
+   #:heightmap-scale
+   #:heightmap-clear
+   #:heightmap-clamp
+   #:heightmap-copy
+   #:heightmap-normalize
+   #:heightmap-normalise
+   #:heightmap-lerp-hm
+   #:heightmap-add-hm
+   #:heightmap-multiply-hm
+   #:heightmap-add-hill
+   #:heightmap-dig-hill
+   #:heightmap-rain-erosion
+   #:heightmap-kernel-transform
+   #:heightmap-add-voronoi
+   #:heightmap-add-fbm
+   #:heightmap-scale-fbm
+   #:heightmap-dig-bezier
    #:heightmap-get-value
    #:heightmap-get-interpolated-value
    #:heightmap-get-slope
-   #:heightmap-set-value
-   #:heightmap-add
-   #:heightmap-add-fbm
-   #:heightmap-scale
-   #:heightmap-lerp
-   #:heightmap-add-hm
-   #:heightmap-multiply-hm
-   #:heightmap-clear
-   #:heightmap-delete
-   #:heightmap-clamp
+   #:heightmap-get-normal
    #:heightmap-count-cells
    #:heightmap-has-land-on-border?
    #:heightmap-get-min
    #:heightmap-get-max
-   #:heightmap-normalize
-   #:heightmap-normalise
-   #:heightmap-copy
-   #:heightmap-dig-bezier
-   #:heightmap-dig-line
-   #:heightmap-rain-erosion
+   #:heightmap-islandify
+   #:heightmap-dig-line    ; defined in cl-tcod
    ;; [[Field of view]] =======================================================
    #:fov-algorithm
    #:mapptr
    #:map-new
    #:map-set-properties
+   #:map-clear
+   #:map-copy
+   #:map-delete
    #:map-compute-fov
    #:map-is-in-fov?
+   #:map-set-in-fov
    #:map-is-transparent?
    #:map-is-walkable?
-   #:map-clear
-   #:map-delete
-   #:map-copy
+   #:map-get-width
+   #:map-get-height
+   #:map-get-nb-cells
    ;; [[A* pathfinding]] ======================================================
    #:a*-path
-   #:dijkstra-path
    #:path-new-using-map
    #:path-new-using-function
    #:path-delete
    #:path-compute
+   #:path-reverse
+   #:path-get
    #:path-get-origin
    #:path-get-destination
    #:path-size
-   #:path-get
    #:path-walk
    #:path-is-empty?
    ;; [[Dijkstra pathfinding]] ================================================
@@ -272,18 +318,89 @@
    #:dijkstra-new-using-function
    #:dijkstra-delete
    #:dijkstra-compute
+   #:dijkstra-reverse
    #:dijkstra-path-set
    #:dijkstra-size
-   #:dijkstra-get-distance
    #:dijkstra-get
    #:dijkstra-is-empty?
    #:dijkstra-path-walk
+   #:dijkstra-get-distance
+   ;; [[Bresenham line drawing]] ==============================================
+   #:line-init
+   #:line-step
+   #:line-line
+   ;; [[BSP trees]] ===========================================================
+   #:bsp-new-with-size
+   #:bsp-remove-sons
+   #:bsp-split-once
+   #:bsp-split-recursive
+   #:bsp-delete
+   #:bsp-resize
+   #:bsp-left
+   #:bsp-right
+   #:bsp-father
+   #:bsp-is-leaf?
+   #:bsp-contains?
+   #:bsp-find-node
+   #:bsp-traverse-pre-order
+   #:bsp-traverse-in-order
+   #:bsp-traverse-post-order
+   #:bsp-traverse-level-order
+   #:bsp-traverse-inverted-level-order
+   ;; [[Name generation]] =====================================================
+   #:namegen-parse
+   #:namegen-destroy
+   #:namegen-generate
+   #:namegen-generate-custom
+   ;;#:namegen-get-sets -- not yet implemented as returns a TCOD_list_t type
+   ;; [[Compression toolkit]] =================================================
+   #:zipptr
+   #:zip-new
+   #:zip-delete
+   #:zip-put
+   #:zip-put-char
+   #:zip-put-int
+   #:zip-put-float
+   #:zip-put-string
+   #:zip-put-colour
+   #:zip-put-color
+   #:zip-put-image
+   #:zip-put-console
+   #:zip-put-data
+   #:zip-get-char
+   #:zip-get-int
+   #:zip-get-float
+   #:zip-get-string
+   #:zip-get-image
+   #:zip-get-colour
+   #:zip-get-color
+   #:zip-get-console
+   #:zip-get-data
+   #:zip-get-current-bytes
+   #:zip-get-remaining-bytes
+   #:zip-skip-bytes
+   #:zip-save-to-file
+   #:zip-load-from-file
    ;; [[System]] ==============================================================
-   #:sys-save-screenshot
-   #:sys-sleep-milli
    #:sys-set-fps
    #:sys-get-fps
+   #:sys-get-last-frame-length
+   #:sys-sleep-milli
+   #:sys-elapsed-milli
+   #:sys-elapsed-seconds
+   #:sys-save-screenshot
+   #:sys-create-directory ;;
+   #:sys-delete-directory ;;
    #:sys-get-current-resolution
+   #:sys-force-fullscreen-resolution ;;
+   #:sys-get-fullscreen-offsets ;;
+   #:sys-get-renderer
+   #:sys-set-renderer
+   #:sys-register-sdl-renderer ;;
+   #:sys-get-char-size
+   #:sys-update-char ;;
+   #:sys-clipboard-set ;;
+   #:sys-clipboard-get ;;
    #:sys-flush
    ;; [[Testing]] =============================================================
    )
@@ -334,10 +451,13 @@ libtcod newer than 1.4.1rc2, which is the first version that includes the
 with libtcod.
 
 1. Ensure you have a working common lisp installation.
-2. Ensure the ASDF lisp library is installed.
-3. If CFFI or DEFSTAR are not installed, download and install them somewhere ASDF
-   can find them. CFFI requires several third-party lisp libraries -- see the
-   CFFI documentation for more details.
+2. Ensure either [[http://www.quicklisp.org/][Quicklisp]] or the ASDF lisp
+   library is installed.
+3. If CFFI or DEFSTAR are not installed, download and install them somewhere
+   ASDF can find them. CFFI requires several third-party lisp libraries -- see
+   the CFFI documentation for more details.  Note that if you have
+   Quicklisp installed, you can install CFFI and its dependencies
+   easily using the command =(ql:quickload \"cffi\")= at the Lisp prompt.
 4. Put the CL-TCOD files in a directory where ASDF can find them.
 5. Make sure libtcod is installed and compiled. Make sure the libtcod
    dynamically linked library (=.DLL= or =.SO= file) is somewhere your lisp system
@@ -356,7 +476,11 @@ with libtcod.
    Use your package installer to install =libSDL=.
    Try running the libtcod demo programs to check everything works.
 
-6. Start lisp. Load ASDF, then CL-TCOD:
+6. Start lisp, then load CL-TCOD. Using Quicklisp:
+
+;;;   (ql:quickload :tcod)
+
+   Using ASDF:
 
 ;;;   (load \"/path/to/asdf/asdf.lisp\")
 ;;;   (asdf:oos 'asdf:load-op :tcod)
@@ -472,6 +596,18 @@ becomes:
 
 ;;;  (tcod:console-print-double-frame CONSOLE X Y W H EMPTY? STRING...)
 
+** Coverage
+
+Does not provide wrappers for:
+- File parser. Using this from lisp would be a very cumbersome way to read
+  values from a file, as the resulting values are not lisp objects. You would
+  be better to either consider using the lisp
+  `read' function, or looking into lisp libraries for parser generation.
+- =namegen-get-sets= -- I haven't yet implemented this as it will have to
+  involve converting from libtcod's bespoke 'linked list' to a lisp list.
+  You may be better to write your random name generator in lisp (fairly trivial).
+- =sys-get-directory-content=, =sys-file-exists=, =sys-is-directory=,
+  =sys-delete-file=: Common Lisp already has functions that do the same thing.
 
 * Resources
 
@@ -500,8 +636,15 @@ Recommended, especially if coming from non-lisp languages.
 
 - [[http://www.gigamonkeys.com/book/]]
 
+[[http://www.quicklisp.org/][Quicklisp]] allows you to very easily install
+libraries -- it automatically downloads and installs a library and its
+dependencies, from within Lisp.  If you don't decide to go with Lisp in a
+Box (below), then Quicklisp should be the first thing you install once you have
+your lisp running.
+
 *\"Lisp in a Box\"* -- aims to make it easy to start using Common Lisp by
-providing a single download with everything set up in advance:
+providing a single download with everything set up in advance (Lisp, Emacs,
+SLIME, and Quicklisp).
 
 - [[http://common-lisp.net/project/lispbox/]]
 
@@ -514,15 +657,15 @@ Lisp editors and IDEs:
   [[http://www.lispworks.com/][LispWorks]] lisp implementations each have a
   builtin IDE.
 - If you are on a Mac, the free, high-quality [[http://ccl.clozure.com][Clozure CL]]
-  has a builtin IDE called Cocoa.
-- Some editors with good lisp syntax highlighting include jEdit and Notepad++
+  has a builtin graphical IDE.
+- Some editors with good lisp syntax highlighting include jEdit and Notepad++.
 
 ** A note on editors and IDEs
 
 Emacs is a very powerful program. It is mainly used as a programmers' text and
 source code editor, but it can do -- and plugins exist to make it do -- just
 about anything you can imagine. It is mostly written in a dialect of lisp, and
-this is also its extension language. When combined with SLIME, a plugin (mode)
+this is also its extension language. When combined with SLIME, a plugin
 that allows it to communicate directly with a running common lisp
 compiler/interpreter, Emacs is not only the best IDE for common lisp, but
 one of the best and most advanced IDEs available for any programming language.
@@ -530,10 +673,11 @@ one of the best and most advanced IDEs available for any programming language.
 The downside: because Emacs + SLIME is so good, common lisp programmers have
 put very little effort into getting other popular programming editors/IDEs to
 support common lisp, at least beyond simple syntax highlighting. Emacs is an
-idiosyncratic program (it is about 34 years old) and despite good efforts to
-modernise/regularise its interface it still has a steeper learning curve than
-many other IDEs, especially when you are also struggling to set up SLIME and
-get it to communicate with your lisp...
+idiosyncratic program (though development is active, it is about 34 years old)
+and despite good efforts to modernise/regularise its interface it still has a
+steeper learning curve than many other IDEs, especially when you are also
+struggling to set up SLIME and get it to communicate through a socket with
+your lisp process...
 
 My advice is that while all roads lead to Emacs, you don't have to hurry to get
 there. Initially you should concentrate on getting common lisp set up and
@@ -545,8 +689,10 @@ SLIME.
 ** Commercial Common Lisp implementations
 
 These are both high quality, but painfully expensive. Luckily they have
-'limited' versions that can be downloaded for free, and which I recommend you
-use when beginning to learn common lisp.
+'trial' versions that can be downloaded for free, and which I recommend you
+use when beginning to learn Common Lisp as they come with integrated
+graphical editors/development environments (although if you have a Mac
+you may wish to investigate Clozure CL's IDE -- see below).
 
 - [[http://www.franz.com/products/allegrocl/][Allegro]] -- starts at $599 USD
 - [[http://www.lispworks.com/][LispWorks]] -- starts at $900 USD for a
@@ -556,17 +702,29 @@ use when beginning to learn common lisp.
 
 Move on to one of these if and when you outgrow Allegro or LispWorks.
 
-- [[http://www.sbcl.org]] (compiles to machine code, great on Linux/Mac,
-  still 'experimental' on Windows)
-- [[http://clisp.cons.org][GNU CLISP]] (bytecode compiler, but runs pretty much
-  everywhere)
-- [[http://ccl.clozure.com][Clozure CL]] (compiles to machine code; native to
-  Mac but runs well on Linux and Windows; it has displaced SBCL to become my
-  implementation of choice)
+For the title of the best, most robust free multiplatform Common Lisp compiler,
+it is currently a very close call between these two:
+- [[http://www.sbcl.org][Steel Bank Common Lisp (SBCL)]] Compiles to
+  machine code, great on Linux/Mac,
+  still nominally 'experimental' on Windows but actually seems very stable
+  on that platform.
+- [[http://ccl.clozure.com][Clozure CL]] Compiles to machine code; native to
+  Mac but recently ported to Linux and Windows. Formerly known as OpenMCL.
+  The Mac version has a graphical IDE.
+  Not to be confused with [[http://clojure.org][Clojure]], which is a different
+  dialect of lisp from Common Lisp.
+
+Other worthwhile free implementations:
+- [[http://clisp.cons.org][GNU CLISP]] Bytecode compiler, but runs pretty much
+  everywhere, easy to install on Windows.
 - [[http://ecls.sourceforge.net/][Embeddable Common Lisp]] Promising, compiles
   to C and then passes code to your C compiler. Does this 'on the fly' when
-  running as an interpreter. Also designed to be easily embeddable as a
-  scripting language.
+  running as an interpreter. Also designed to be easily embeddable in non-Lisp
+  applications as a scripting language.
+- [[http://common-lisp.net/project/armedbear/][Armed Bear Common Lisp]]
+  Common Lisp compiler running inside the Java virtual machine, so your
+  code will run on any platform and can use all the Java libraries. I'm not
+  sure you'll be able to use libtcod with this though.
 
 Help & advice with lisp:
 
@@ -575,6 +733,8 @@ Help & advice with lisp:
 
 (in-package :tcod)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+ (pushnew :tcod *features*))
 
 ;;; Comment this out if you want cl-tcod to be 'fast' rather than 'safe and
 ;;; maximally debuggable'
@@ -672,17 +832,19 @@ is satisfied by a list containing only bitfield keywords as members."
     (case c-type
       (:boolean 'boolean)
       ((:int :unsigned-int) 'uint)
+      (:char 'signed-char)
       (:unsigned-char 'uchar)
       (:uint8 'uint8)
       (:uint32 'uint32)
       (:float 'single-float)
+      (:double 'double-float)
       (:pointer (type-of (null-pointer)))
       (:string 'string)
       (:void t)
       (otherwise
        (if (simple-type? c-type)
            c-type
-           (error "In C-TYPE->LISP-TYPE: unrecognised c type `~S'." c-type))))))
+           (error "In C-TYPE->LISP-TYPE: unrecognised C type `~S'." c-type))))))
 
 
 (defmacro define-c-function ((foreign-fn-name fn-name) return-type args
@@ -700,21 +862,25 @@ is satisfied by a list containing only bitfield keywords as members."
    C function."
   (let ((args-no-rest (remove '&rest args)))
     `(progn
-       (defcfun (,foreign-fn-name ,(prepend-percent fn-name)) ,return-type
-         ,@args)
-       (declaim (inline ,fn-name))
-       (defun* (,fn-name -> ,(c-type->lisp-type return-type))
-           ,(mapcar #'(lambda (clause)
-                        `(,(first clause) ,(c-type->lisp-type (second clause))
-                           ,@(cddr clause)))
-                    args-no-rest)
-         ,@(if (stringp (car body)) (list (pop body)) nil)
-         ,(if body
-              `(macrolet ((call-it (&rest callargs)
-                            (cons ',(prepend-percent fn-name)
-                                  (or callargs '(,@(mapcar #'car args-no-rest))))))
-                 ,@body)
-              `(,(prepend-percent fn-name) ,@(mapcar #'car args-no-rest)))))))
+       (cond
+         ((null (cffi:foreign-symbol-pointer ,foreign-fn-name))
+          (warn "Foreign function not found: ~S" ,foreign-fn-name))
+         (t
+          (defcfun (,foreign-fn-name ,(prepend-percent fn-name)) ,return-type
+            ,@args)
+          (declaim (inline ,fn-name))
+          (defun* (,fn-name -> ,(c-type->lisp-type return-type))
+              ,(mapcar #'(lambda (clause)
+                           `(,(first clause) ,(c-type->lisp-type (second clause))
+                              ,@(cddr clause)))
+                       args-no-rest)
+            ,@(if (stringp (car body)) (list (pop body)) nil)
+            ,(if body
+                 `(macrolet ((call-it (&rest callargs)
+                               (cons ',(prepend-percent fn-name)
+                                     (or callargs '(,@(mapcar #'car args-no-rest))))))
+                    ,@body)
+                 `(,(prepend-percent fn-name) ,@(mapcar #'car args-no-rest)))))))))
 
 
 
@@ -726,6 +892,9 @@ name."
      (deftype ,name () ',(c-type->lisp-type foreign-type))))
 
 
+(defmacro clamp (low hi expr)
+  "Return the numeric value of EXPR, constrained to the range [LOW ... HI]."
+  `(min ,hi (max ,low ,expr)))
 
 
 ;;;; <<Types>> ================================================================
@@ -737,6 +906,7 @@ name."
 (deftype uint8 () `(unsigned-byte 8))
 (deftype uint () `(unsigned-byte ,(* 8 (foreign-type-size :int))))
 (deftype uchar () `(unsigned-byte ,(* 8 (foreign-type-size :unsigned-char))))
+(deftype signed-char () `(signed-byte ,(* 8 (foreign-type-size :char))))
 
 (deftype sint16 () `(signed-byte 16))
 
@@ -749,9 +919,9 @@ name."
 ;; TCOD_color_t
 ;; This is seldom used -- colournums are used instead (see above).
 (defcstruct colour
-	(r :uint8)
-	(g :uint8)
-	(b :uint8))
+  (r :uint8)
+  (g :uint8)
+  (b :uint8))
 
 
 ;; TCOD_renderer_t (enum)
@@ -763,82 +933,82 @@ name."
 
 ;; TCOD_keycode_t (enum)
 (define-c-enum keycode
-	:NONE
-	:ESCAPE
-	:BACKSPACE
-	:TAB
-	:ENTER
-	:SHIFT
-	:CONTROL
-	:ALT
-	:PAUSE
-	:CAPSLOCK
-	:PAGEUP
-	:PAGEDOWN
-	:END
-	:HOME
-	:UP
-	:LEFT
-	:RIGHT
-	:DOWN
-	:PRINTSCREEN
-	:INSERT
-	:DELETE
-	:LWIN
-	:RWIN
-	:APPS
-	:key-0
-	:key-1
-	:key-2
-	:key-3
-	:key-4
-	:key-5
-	:key-6
-	:key-7
-	:key-8
-	:key-9
-	:KP0
-	:KP1
-	:KP2
-	:KP3
-	:KP4
-	:KP5
-	:KP6
-	:KP7
-	:KP8
-	:KP9
-	:KPADD
-	:KPSUB
-	:KPDIV
-	:KPMUL
-	:KPDEC
-	:KPENTER
-	:F1
-	:F2
-	:F3
-	:F4
-	:F5
-	:F6
-	:F7
-	:F8
-	:F9
-	:F10
-	:F11
-	:F12
-	:NUMLOCK
-	:SCROLLLOCK
-	:SPACE
-	:CHAR)
+  :NONE
+  :ESCAPE
+  :BACKSPACE
+  :TAB
+  :ENTER
+  :SHIFT
+  :CONTROL
+  :ALT
+  :PAUSE
+  :CAPSLOCK
+  :PAGEUP
+  :PAGEDOWN
+  :END
+  :HOME
+  :UP
+  :LEFT
+  :RIGHT
+  :DOWN
+  :PRINTSCREEN
+  :INSERT
+  :DELETE
+  :LWIN
+  :RWIN
+  :APPS
+  :key-0
+  :key-1
+  :key-2
+  :key-3
+  :key-4
+  :key-5
+  :key-6
+  :key-7
+  :key-8
+  :key-9
+  :KP0
+  :KP1
+  :KP2
+  :KP3
+  :KP4
+  :KP5
+  :KP6
+  :KP7
+  :KP8
+  :KP9
+  :KPADD
+  :KPSUB
+  :KPDIV
+  :KPMUL
+  :KPDEC
+  :KPENTER
+  :F1
+  :F2
+  :F3
+  :F4
+  :F5
+  :F6
+  :F7
+  :F8
+  :F9
+  :F10
+  :F11
+  :F12
+  :NUMLOCK
+  :SCROLLLOCK
+  :SPACE
+  :CHAR)
 
 
 ;; TCOD_key_t
 ;; This is no longer used -- key structs are converted to a bitfield by
 ;; wrapper functions in libtcod.
 (defcstruct key-press
-	(vk keycode)     ; character if vk == TCODK_CHAR else 0
-	(c :unsigned-char)
-	(flags :uint8))  ; does this correspond to a key press or key
-					; release event ?
+  (vk keycode)                        ; character if vk == TCODK_CHAR else 0
+  (c :unsigned-char)
+  (flags :uint8))                  ; does this correspond to a key press or key
+                                   ; release event ?
 
 
 (defstruct key
@@ -857,118 +1027,125 @@ to the structure used by libtcod."
 
 
 (define-c-enum drawing-character
-	(:CHAR-HLINE 196)
-	(:CHAR-VLINE 179)
-	(:CHAR-NE 191)
-	(:CHAR-NW 218)
-	(:CHAR-SE 217)
-	(:CHAR-SW 192)
-	(:CHAR-TEEW 180)
-	(:CHAR-TEEE 195)
-	(:CHAR-TEEN 193)
-	(:CHAR-TEES 194)
-	(:CHAR-CROSS 197)
-	;; Double walls
-	(:CHAR-DHLINE 205)
-	(:CHAR-DVLINE 186)
-	(:CHAR-DNE 187)
-	(:CHAR-DNW 201)
-	(:CHAR-DSE 188)
-	(:CHAR-DSW 200)
-	(:CHAR-DTEEW 181)
-	(:CHAR-DTEEE 198)
-	(:CHAR-DTEEN 208)
-	(:CHAR-DTEES 210)
-	(:CHAR-DCROSS 206)
-	;; Blocks
-	(:CHAR-BLOCK1 178)
-	(:CHAR-BLOCK2 177)
-	(:CHAR-BLOCK3 176)
-	;; Arrows
-	(:CHAR-ARROW-N 24)
-	(:CHAR-ARROW-S 25)
-	(:CHAR-ARROW-E 26)
-	(:CHAR-ARROW_W 27)
-	;; Arrows without tail
-	(:CHAR-ARROW2-N 30)
-	(:CHAR-ARROW2-S 31)
-	(:CHAR-ARROW2-E 16)
-	(:CHAR-ARROW2-W 17)
-	;; Double arrows
-	(:CHAR-DARROW2-H 29)
-	(:CHAR-DARROW2-V 18)
-	;; GUI stuff
-	(:CHAR-CHECKBOX-UNSET 224)
-	(:CHAR-CHECKBOX-SET 225)
-	(:CHAR-RADIO-UNSET 9)
-	(:CHAR-RADIO-SET 10)
-	;; Subpixel resolution kit
-	(:CHAR-SUBP-NW 226)
-	(:CHAR-SUBP-NE 227)
-	(:CHAR-SUBP-N 228)
-	(:CHAR-SUBP-SE 229)
-	(:CHAR-SUBP-DIAG 230)
-	(:CHAR-SUBP-E 231)
-	(:CHAR-SUBP-SW 232))
+  (:CHAR-HLINE 196)
+  (:CHAR-VLINE 179)
+  (:CHAR-NE 191)
+  (:CHAR-NW 218)
+  (:CHAR-SE 217)
+  (:CHAR-SW 192)
+  (:CHAR-TEEW 180)
+  (:CHAR-TEEE 195)
+  (:CHAR-TEEN 193)
+  (:CHAR-TEES 194)
+  (:CHAR-CROSS 197)
+  ;; Double walls
+  (:CHAR-DHLINE 205)
+  (:CHAR-DVLINE 186)
+  (:CHAR-DNE 187)
+  (:CHAR-DNW 201)
+  (:CHAR-DSE 188)
+  (:CHAR-DSW 200)
+  (:CHAR-DTEEW 181)
+  (:CHAR-DTEEE 198)
+  (:CHAR-DTEEN 208)
+  (:CHAR-DTEES 210)
+  (:CHAR-DCROSS 206)
+  ;; Blocks
+  (:CHAR-BLOCK1 178)
+  (:CHAR-BLOCK2 177)
+  (:CHAR-BLOCK3 176)
+  ;; Arrows
+  (:CHAR-ARROW-N 24)
+  (:CHAR-ARROW-S 25)
+  (:CHAR-ARROW-E 26)
+  (:CHAR-ARROW_W 27)
+  ;; Arrows without tail
+  (:CHAR-ARROW2-N 30)
+  (:CHAR-ARROW2-S 31)
+  (:CHAR-ARROW2-E 16)
+  (:CHAR-ARROW2-W 17)
+  ;; Double arrows
+  (:CHAR-DARROW2-H 29)
+  (:CHAR-DARROW2-V 18)
+  ;; GUI stuff
+  (:CHAR-CHECKBOX-UNSET 224)
+  (:CHAR-CHECKBOX-SET 225)
+  (:CHAR-RADIO-UNSET 9)
+  (:CHAR-RADIO-SET 10)
+  ;; Subpixel resolution kit
+  (:CHAR-SUBP-NW 226)
+  (:CHAR-SUBP-NE 227)
+  (:CHAR-SUBP-N 228)
+  (:CHAR-SUBP-SE 229)
+  (:CHAR-SUBP-DIAG 230)
+  (:CHAR-SUBP-E 231)
+  (:CHAR-SUBP-SW 232))
 
 
 ;; TCOD_colctrl_t (enum)
 (define-c-enum colctrl
-	(:COLCTRL-1 1)
-	:COLCTRL-2
-	:COLCTRL-3
-	:COLCTRL-4
-	:COLCTRL-5
-	(:COLCTRL-NUMBER 5)
-	:COLCTRL-FORE-RGB
-	:COLCTRL-BACK-RGB
-	:COLCTRL-STOP )
+  (:COLCTRL-1 1)
+  :COLCTRL-2
+  :COLCTRL-3
+  :COLCTRL-4
+  :COLCTRL-5
+  (:COLCTRL-NUMBER 5)
+  :COLCTRL-FORE-RGB
+  :COLCTRL-BACK-RGB
+  :COLCTRL-STOP )
 
 ;; TCOD_bkgnd_flag_t (enum)
 (define-c-enum background-flag
-	:NONE
-	:SET
-	:MULTIPLY
-	:LIGHTEN
-	:DARKEN
-	:SCREEN
-	:COLOR-DODGE
-	:COLOR-BURN
-	:ADD
-	:ADDA
-	:BURN
-	:OVERLAY
-	:ALPH)
+  :NONE
+  :SET
+  :MULTIPLY
+  :LIGHTEN
+  :DARKEN
+  :SCREEN
+  :COLOR-DODGE
+  :COLOR-BURN
+  :ADD
+  :ADDA
+  :BURN
+  :OVERLAY
+  :ALPH)
 
 
 (define-c-enum alignment
-	:LEFT
-	:CENTER
-	:RIGHT)
+  :LEFT
+  :CENTER
+  :RIGHT)
 
 
 (define-c-bitfield key-state
-	(:KEY-PRESSED 1)
-	(:KEY-RELEASED 2))
+  (:KEY-PRESSED 1)
+  (:KEY-RELEASED 2))
 
 
 (define-c-bitfield custom-font-flags
-	(:FONT-LAYOUT-ASCII-IN-COL 1)
-	(:FONT-LAYOUT-ASCII-IN-ROW 2)
-	(:FONT-TYPE-GREYSCALE 4)
-	(:FONT-LAYOUT-TCOD 8))
+  (:FONT-LAYOUT-ASCII-IN-COL 1)
+  (:FONT-LAYOUT-ASCII-IN-ROW 2)
+  (:FONT-TYPE-GREYSCALE 4)
+  (:FONT-LAYOUT-TCOD 8))
 
 
 (define-c-enum noise-type
-    (:NOISE-DEFAULT 0)
+  (:NOISE-DEFAULT 0)
   (:NOISE-PERLIN 1)
   (:NOISE-SIMPLEX 2)
   (:NOISE-WAVELET 4))
 
 
-(define-c-enum rng-algorithm
-	:RNG-MT
-	:RNG-CMWC)
+(define-c-enum rng-algorithm            ; TCOD_random_algo_t
+  :RNG-MT
+  :RNG-CMWC)
+
+(define-c-enum rng-distribution         ; TCOD_distribution_t
+  :DISTRIBUTION-LINEAR
+  :DISTRIBUTION-GAUSSIAN
+  :DISTRIBUTION-GAUSSIAN-RANGE
+  :DISTRIBUTION-GAUSSIAN-INVERSE
+  :DISTRIBUTION-GAUSSIAN-RANGE-INVERSE)
 
 
 (define-c-enum fov-algorithm
@@ -991,28 +1168,41 @@ to the structure used by libtcod."
 (define-c-type console :pointer)
 
 
-;; TCOD_random_t
+;; TCOD_bsp_t = a struct
+;; but all variables pass a pointer to this struct
+(define-c-type bsp-ptr :pointer)
+
+
+;; TCOD_random_t = pointer to void
 (define-c-type randomptr :pointer)
+
+
+;; TCOD_parser_t = pointer to void
+(define-c-type parser :pointer)
+
+
+;; TCOD_zip_t = pointer to void
+(define-c-type zipptr :pointer)
 
 
 ;; TCOD_mouse_t
 (defcstruct mouse-state
-	(x :int)
-	(y :int)
-	(dx :int)
-	(dy :int)
-	(cx :int)
-	(cy :int)
-	(dcx :int)
-	(dcy :int)
-        (lbutton :boolean)
-        (rbutton :boolean)
-        (mbutton :boolean)
-        (lbutton-pressed :boolean)
-        (rbutton-pressed :boolean)
-        (mbutton-pressed :boolean)
-        (wheel-up :boolean)
-        (wheel-down :boolean))
+  (x :int)
+  (y :int)
+  (dx :int)
+  (dy :int)
+  (cx :int)
+  (cy :int)
+  (dcx :int)
+  (dcy :int)
+  (lbutton :boolean)
+  (rbutton :boolean)
+  (mbutton :boolean)
+  (lbutton-pressed :boolean)
+  (rbutton-pressed :boolean)
+  (mbutton-pressed :boolean)
+  (wheel-up :boolean)
+  (wheel-down :boolean))
 
 (defstruct mouse
   "Structure used by CL-TCOD to represent mouse status."
@@ -1033,17 +1223,23 @@ to the structure used by libtcod."
   (wheel-up nil :type boolean)
   (wheel-down nil :type boolean))
 
-;; TCOD_image_t
+;; TCOD_image_t = pointer to void
 (define-c-type image :pointer)
 
+;; TCOD_noise_t = pointer to void
 (define-c-type noise :pointer)
 
-(define-c-type heightmap :pointer)
+;; TCOD_heightmap_t = a struct
+;; but all functions pass/take pointers to heightmaps
+(define-c-type heightmap-ptr :pointer)
 
+;; TCOD_map_t = pointer to void
 (define-c-type mapptr :pointer)
 
+;; TCOD_path_t = pointer to void
 (define-c-type a*-path :pointer)
 
+;; TCOD_dijkstra_t = pointer to void
 (define-c-type dijkstra-path :pointer)
 
 
@@ -1090,9 +1286,9 @@ defined by [[deftype]]."
        (eql (key-c key1) (key-c key2))
        (eql (key-shift key1) (key-shift key2))
        (eql (or (key-lalt key1) (key-ralt key1))
-	    (or (key-lalt key2) (key-ralt key2)))
+            (or (key-lalt key2) (key-ralt key2)))
        (eql (or (key-lctrl key1) (key-rctrl key1))
-	    (or (key-lctrl key2) (key-rctrl key2)))))
+            (or (key-lctrl key2) (key-rctrl key2)))))
 
 
 
@@ -1108,13 +1304,55 @@ blue components of a colour, return a 3 byte integer whose value is #xBBGGRR."
   (defun compose-color (r g b) (compose-colour r g b)))
 
 
+(defun* (colour-rgb -> uint32) ((r uint8) (g uint8) (b uint8))
+  (compose-colour r g b))
+(defun color-rgb (r g b) (colour-rgb r g b))
+
+
+(defun* (colour-hsv -> uint32) ((hue single-float) (sat single-float)
+                                (val single-float))
+  "Return a new colour with the given HSV (hue, saturation and value)
+components."
+  (cond
+   ((zerop sat)
+    ;; Achromatic grey
+    (compose-colour (truncate (+ 0.5 (* 255.0 val)))
+                    (truncate (+ 0.5 (* 255.0 val)))
+                    (truncate (+ 0.5 (* 255.0 val)))))
+   (t
+    (loop while (minusp hue) do (incf hue 360.0))
+    (loop while (>= hue 360.0) do (decf hue 360.0))
+    (setf hue (/ hue 60.0))
+    (let* ((i (truncate hue))
+           (f (- hue i))
+           (p (* val (- 1 sat)))
+           (q (* val (- 1 (* sat f))))
+           (z (* val (- 1 (* sat (- 1 f)))))) ; variable t renamed to z
+      (compose-colour
+       (truncate
+        (+ 0.5 (* 255.0 (case i
+                          (1 q)
+                          ((2 3) p)
+                          (4 z)
+                          (t val)))))
+       (truncate
+        (+ 0.5 (* 255.0 (case i
+                          ((1 2) val)
+                          (3 q)
+                          (t p)))))
+       (truncate
+        (+ 0.5 (* 255.0 (case i
+                          ((0 1) p) (2 z) ((3 4) val) (t q))))))))))
+(defun color-hsv (hue sat val) (colour-hsv hue sat val))
+
+
 (defun* (decompose-colour -> (values uint8 uint8 uint8)) ((num colournum))
-  "Given a colournum #xBBGGRR, return R, G and B integer values
-as 3 separate return values."
+  "Given a colournum #xBBGGRR, return R, G and B integer values as 3 separate
+return values."
   (values
-	 (logand num #x0000ff)
-	 (ash (logand num #x00ff00) -8)
-	 (ash (logand num #xff0000) -16)
+         (logand num #x0000ff)
+         (ash (logand num #x00ff00) -8)
+         (ash (logand num #xff0000) -16)
          ))
 (declaim (inline decompose-color))
 (defun decompose-color (num) (decompose-colour num))
@@ -1129,54 +1367,54 @@ as 3 separate return values."
 
 (defvar *colour-table* nil)
 (defvar *initial-colours*
-  `((:true-black	#x00 #x00 #x00)
-    (:true-pink		#xFF #x00 #xFF)
-    (:true-white	#xFF #xFF #xFF)
-    (:true-red		#xFF #x00 #x00)
-    (:true-green	#x00 #xFF #x00)
-    (:true-blue		#x00 #x00 #xFF)
-    (:black		#x00 #x00 #x00)
-    (:dark-grey 	96 96 96)
-    (:grey 		196 196 196)
-    (:white 		255 255 255)
-    (:blue		13 103 196)
-    (:dark-blue 	40 40 128)
-    (:light-blue 	120 120 255)
-    (:dark-red 		128 0 0)
-    (:light-red 	255 100 50)
-    (:dark-brown 	32 16 0)
-    (:light-yellow 	255 255 150)
-    (:yellow 		255 255 0)
-    (:dark-yellow 	164 164 0)
-    (:green 		0 220 0)
-    (:cyan		86 163 205)
-    (:orange 		255 150 0)
-    (:red 		255 0 0)
-    (:silver 		203 203 203)
-    (:gold 		255 255 102)
-    (:purple 		204 51 153)
-    (:dark-purple 	51 0 51)
+  `((:true-black        #x00 #x00 #x00)
+    (:true-pink                 #xFF #x00 #xFF)
+    (:true-white        #xFF #xFF #xFF)
+    (:true-red          #xFF #x00 #x00)
+    (:true-green        #x00 #xFF #x00)
+    (:true-blue                 #x00 #x00 #xFF)
+    (:black             #x00 #x00 #x00)
+    (:dark-grey         96 96 96)
+    (:grey              196 196 196)
+    (:white             255 255 255)
+    (:blue              13 103 196)
+    (:dark-blue         40 40 128)
+    (:light-blue        120 120 255)
+    (:dark-red                  128 0 0)
+    (:light-red         255 100 50)
+    (:dark-brown        32 16 0)
+    (:light-yellow      255 255 150)
+    (:yellow            255 255 0)
+    (:dark-yellow       164 164 0)
+    (:green             0 220 0)
+    (:cyan              86 163 205)
+    (:orange            255 150 0)
+    (:red               255 0 0)
+    (:silver            203 203 203)
+    (:gold              255 255 102)
+    (:purple            204 51 153)
+    (:dark-purple       51 0 51)
     ;; Some colours not defined in TCOD.
-    (:slate-grey 	#x80 #x80 #x80)
-    (:umber 		#x80 #x40 0)
-    (:pink 		#xFF #x00 #xFF)
-    (:chocolate 	210 105 30)))
+    (:slate-grey        #x80 #x80 #x80)
+    (:umber             #x80 #x40 0)
+    (:pink              #xFF #x00 #xFF)
+    (:chocolate         210 105 30)))
 
 
 ;;#define TCOD_BKGND_ALPHA(alpha)
 ;;    ((TCOD_bkgnd_flag_t)(TCOD_BKGND_ALPH|(((uint8)(alpha*255))<<8)))
 (defun background-alpha (alpha)
   (foreign-enum-keyword 'background-flag
-			(logior (foreign-enum-value 'background-flag :alph)
-				(ash (mod (* alpha 255) 256) 8))))
+                        (logior (foreign-enum-value 'background-flag :alph)
+                                (ash (mod (* alpha 255) 256) 8))))
 
 ;;
 ;;#define TCOD_BKGND_ADDALPHA(alpha)
 ;;    ((TCOD_bkgnd_flag_t)(TCOD_BKGND_ADDA|(((uint8)(alpha*255))<<8)))
 (defun background-add-alpha (alpha)
   (foreign-enum-keyword 'background-flag
-			(logior (foreign-enum-value 'background-flag :adda)
-				(ash (mod (* alpha 255) 256) 8))))
+                        (logior (foreign-enum-value 'background-flag :adda)
+                                (ash (mod (* alpha 255) 256) 8))))
 
 
 (defun start-colours ()
@@ -1192,7 +1430,7 @@ as 3 separate return values."
   (unless (hash-table-p *colour-table*)
     (start-colours))
   (setf (gethash kwd *colour-table*)
-	(compose-colour r g b)))
+        (compose-colour r g b)))
 (defun make-color (kwd r g b) (make-colour kwd r g b))
 
 
@@ -1224,7 +1462,7 @@ value (#xRRGGBB)."
 
 ;; TCODLIB_API bool TCOD_color_equals (TCOD_color_t c1, TCOD_color_t c2);
 (define-c-function ("TCOD_color_equals_wrapper" colour-equals?) :boolean
-	((c1 colournum) (c2 colournum)))
+        ((c1 colournum) (c2 colournum)))
 (declaim (inline color-equals?))
 (defun color-equals? (c1 c2)
   (colour-equals? c1 c2))
@@ -1232,16 +1470,23 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API TCOD_color_t TCOD_color_add (TCOD_color_t c1, TCOD_color_t c2);
 (define-c-function ("TCOD_color_add_wrapper" colour-add) colournum
-	((c1 colournum) (c2 colournum)))
+        ((c1 colournum) (c2 colournum)))
 (declaim (inline color-add))
 (defun color-add (c1 c2)
   (colour-add c1 c2))
 
 
+(define-c-function ("TCOD_color_subtract_wrapper" colour-subtract) colournum
+        ((c1 colournum) (c2 colournum)))
+(declaim (inline color-subtract))
+(defun color-subtract (c1 c2)
+  (colour-subtract c1 c2))
+
+
 ;;TCODLIB_API TCOD_color_t TCOD_color_multiply (TCOD_color_t c1,
 ;; TCOD_color_t c2);
 (define-c-function ("TCOD_color_multiply_wrapper" colour-multiply) colournum
-	((c1 colournum) (c2 colournum)))
+        ((c1 colournum) (c2 colournum)))
 (declaim (inline color-multiply))
 (defun color-multiply (c1 c2)
   (colour-multiply c1 c2))
@@ -1260,7 +1505,7 @@ value (#xRRGGBB)."
 ;; TCODLIB_API TCOD_color_t TCOD_color_lerp(TCOD_color_t c1, TCOD_color_t c2,
 ;; float coef);
 (define-c-function ("TCOD_color_lerp_wrapper" colour-lerp) colournum
-	((c1 colournum) (c2 colournum) (coef :float)))
+        ((c1 colournum) (c2 colournum) (coef :float)))
 (declaim (inline color-lerp))
 (defun color-lerp (c1 c2 coef)
   (colour-lerp c1 c2 coef))
@@ -1269,19 +1514,19 @@ value (#xRRGGBB)."
 ;; TCODLIB_API void TCOD_color_set_HSV(TCOD_color_t *c,float h, float s,
 ;; float v);
 (define-c-function ("TCOD_color_set_HSV" colour-set-hsv) :void
-	((con :pointer) (hue :float) (sat :float) (v :float)))
+        ((con :pointer) (hue :float) (sat :float) (v :float)))
 (declaim (inline color-set-hsv))
 (defun color-set-hsv (con hue sat v)
   (colour-set-hsv con hue sat v))
 
 
-(define-c-function ("TCOD_color_get_hue_" colour-get-hue) :int
+(define-c-function ("TCOD_color_get_hue_" colour-get-hue) :float
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_saturation_" colour-get-saturation) :int
+(define-c-function ("TCOD_color_get_saturation_" colour-get-saturation) :float
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_value_" colour-get-value) :int
+(define-c-function ("TCOD_color_get_value_" colour-get-value) :float
     ((c colournum)))
 
 
@@ -1290,8 +1535,46 @@ value (#xRRGGBB)."
         (colour-get-saturation c)
         (colour-get-value c)))
 
+
+(defun* (colour-set-hue -> colournum) ((colour colournum) (hue single-float))
+  "Return COLOUR with its hue modified to HUE."
+  (let ((sat (colour-get-saturation colour))
+        (val (colour-get-value colour)))
+    (colour-hsv hue sat val)))
+
+
+(defun* (colour-set-saturation -> colournum) ((colour colournum) (sat single-float))
+  "Return COLOUR with its saturation modified to SAT."
+  (let ((hue (colour-get-hue colour))
+        (val (colour-get-value colour)))
+    (colour-hsv hue sat val)))
+
+
+(defun* (colour-set-value -> colournum) ((colour colournum) (val single-float))
+  "Return COLOUR with its HSV value modified to VAL."
+  (let ((sat (colour-get-saturation colour))
+        (hue (colour-get-hue colour)))
+    (colour-hsv hue sat val)))
+
+
+(defun* (colour-shift-hue -> colournum) ((colour colournum) (hshift single-float))
+  (if (zerop hshift)
+      colour
+      (destructuring-bind (h s v) (colour-get-hsv colour)
+        (colour-hsv (+ h hshift) s v))))
+
+
+(defun* (colour-scale-hsv -> colournum) ((colour colournum) (scoef single-float)
+                                         (vcoef single-float))
+  (destructuring-bind (h s v) (colour-get-hsv colour)
+    (colour-hsv h (clamp 0.0 1.0 (* s scoef)) (clamp 0.0 1.0 (* v vcoef)))))
+
+
 (declaim (inline color-get-hsv color-get-hue color-get-saturation
-                 color-get-value))
+                 color-get-value
+                 color-set-hue color-set-saturation
+                 color-set-value
+                 color-shift-hue))
 
 (defun color-get-hsv (colour)
   (colour-get-hsv colour))
@@ -1300,10 +1583,22 @@ value (#xRRGGBB)."
   (colour-get-hue colour))
 
 (defun color-get-saturation (colour)
-  (colour-get-hue colour))
+  (colour-get-saturation colour))
 
 (defun color-get-value (colour)
-  (colour-get-hue colour))
+  (colour-get-value colour))
+
+(defun color-set-hue (colour hue)
+  (colour-set-hue colour hue))
+
+(defun color-set-saturation (colour sat)
+  (colour-set-saturation colour sat))
+
+(defun color-set-value (colour val)
+  (colour-set-value colour val))
+
+(defun color-shift-hue (colour hshift)
+  (colour-shift-hue colour hshift))
 
 
 
@@ -1391,23 +1686,23 @@ value (#xRRGGBB)."
     ())
 
 ;;TCODLIB_API bool TCOD_console_is_window_closed();
-(define-c-function ("TCOD_console_is_window_closed" console-is-window-closed?) :boolean
-    ())
+(define-c-function ("TCOD_console_is_window_closed" console-is-window-closed?)
+    :boolean ())
 
 
 ;;TCODLIB_API void TCOD_console_set_background_color(TCOD_console_t con,
 ;; TCOD_color_t col);
 (define-c-function ("TCOD_console_set_default_background_wrapper"
-	  console-set-default-background) :void
-	((con console) (col colournum)))
+          console-set-default-background) :void
+        ((con console) (col colournum)))
 (declaim (inline console-set-default-background))
 
 
 ;;TCODLIB_API void TCOD_console_set_foreground_color(TCOD_console_t con,
 ;;                                                   TCOD_color_t col);
 (define-c-function ("TCOD_console_set_default_foreground_wrapper"
-	  console-set-default-foreground) :void
-	((con console) (col colournum)))
+          console-set-default-foreground) :void
+        ((con console) (col colournum)))
 (declaim (inline console-set-default-foreground))
 
 
@@ -1428,7 +1723,7 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API void TCOD_console_clear(TCOD_console_t con);
 (define-c-function ("TCOD_console_clear" console-clear) :void
-	((con console)))
+        ((con console)))
 
 
 ;; New in 1.5.0rc1
@@ -1596,8 +1891,8 @@ value (#xRRGGBB)."
 ;;TCODLIB_API void TCOD_console_print_right(TCOD_console_t con,int x, int y,
 ;; TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_right" %console-print-right) :void
-;; 	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
-;; 	&rest)
+;;      (con console) (x :int) (y :int) (flag background-flag) (fmt :string)
+;;      &rest)
 ;;
 ;; (defun* console-print-right ((con console) (x ucoord) (y ucoord)
 ;;                              (flag background-flag) (fmt string) &rest args)
@@ -1607,8 +1902,8 @@ value (#xRRGGBB)."
 ;;TCODLIB_API void TCOD_console_print_center(TCOD_console_t con,int x, int y,
 ;; TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_center" %console-print-centre) :void
-;; 	(con console) (x :int) (y :int) (flag background-flag) (fmt :string)
-;; 	&rest)
+;;      (con console) (x :int) (y :int) (flag background-flag) (fmt :string)
+;;      &rest)
 ;;
 ;; (defun* console-print-centre ((con console) (x ucoord) (y ucoord)
 ;;                               (flag background-flag) (fmt string)
@@ -1624,9 +1919,9 @@ value (#xRRGGBB)."
 ;;TCODLIB_API int TCOD_console_print_left_rect(TCOD_console_t con,int x, int y,
 ;; int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_left_rect" %console-print-left-rect) :int
-;; 	(con console) (x :int) (y :int) (w :int) (h :int)
-;; 	(flag background-flag) (fmt :string)
-;; 	&rest)
+;;      (con console) (x :int) (y :int) (w :int) (h :int)
+;;      (flag background-flag) (fmt :string)
+;;      &rest)
 ;;
 ;; (defun* console-print-left-rect ((con console) (x ucoord) (y ucoord)
 ;;                                  (w ucoord) (h ucoord)
@@ -1638,9 +1933,9 @@ value (#xRRGGBB)."
 ;;TCODLIB_API int TCOD_console_print_right_rect(TCOD_console_t con,int x,
 ;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...);
 ;; (defcfun ("TCOD_console_print_right_rect" %console-print-right-rect) :int
-;; 	(con console) (x :int) (y :int) (w :int) (h :int)
-;; 	(flag background-flag) (fmt :string)
-;; 	&rest)
+;;      (con console) (x :int) (y :int) (w :int) (h :int)
+;;      (flag background-flag) (fmt :string)
+;;      &rest)
 ;;
 ;; (defun* console-print-right-rect ((con console) (x ucoord) (y ucoord)
 ;;                                   (w ucoord) (h ucoord)
@@ -1651,8 +1946,8 @@ value (#xRRGGBB)."
 
 
 (defcfun ("TCOD_console_print_rect" %console-print-rect) :int
-	(con console) (x :int) (y :int) (w :int) (h :int)
-	(fmt :string) &rest)
+        (con console) (x :int) (y :int) (w :int) (h :int)
+        (fmt :string) &rest)
 
 (defun* console-print-rect ((con console) (x ucoord) (y ucoord)
                                   (w ucoord) (h ucoord)
@@ -1662,8 +1957,8 @@ value (#xRRGGBB)."
 
 
 (defcfun ("TCOD_console_print_rect_ex" %console-print-rect-ex) :int
-	(con console) (x :int) (y :int) (w :int) (h :int)
-	(flag background-flag) (align alignment) (fmt :string) &rest)
+        (con console) (x :int) (y :int) (w :int) (h :int)
+        (flag background-flag) (align alignment) (fmt :string) &rest)
 
 (defun* console-print-rect-ex ((con console) (x ucoord) (y ucoord)
                                (w ucoord) (h ucoord)
@@ -1672,25 +1967,6 @@ value (#xRRGGBB)."
   (assert (legal-console-coordinates? con x y))
   (%console-print-rect-ex con x y w h flag align
                           (apply #'format nil fmt args)))
-
-
-;;TCODLIB_API int TCOD_console_print_center_rect(TCOD_console_t con,int x,
-;; int y, int w, int h, TCOD_bkgnd_flag_t flag, const char *fmt, ...);
-;; (defcfun ("TCOD_console_print_center_rect" %console-print-centre-rect) :int
-;; 	(con console) (x :int) (y :int) (w :int) (h :int)
-;; 	(flag background-flag) (fmt :string)
-;; 	&rest)
-;;
-;; (defun* console-print-centre-rect ((con console) (x ucoord) (y ucoord)
-;;                                    (w ucoord) (h ucoord)
-;;                                    (flag background-flag) (fmt string) &rest args)
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-print-centre-rect con x y w h flag
-;;                               (apply #'format nil fmt args)))
-;;
-;; (declaim (inline console-print-center-rect))
-;; (defun console-print-center-rect (con x y w h flag fmt &rest args)
-;;   (apply #'console-print-centre-rect con x y w h flag fmt args))
 
 
 
@@ -1707,57 +1983,14 @@ value (#xRRGGBB)."
 
 
 (defcfun ("TCOD_console_get_height_rect" %console-get-height-rect) :int
-	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
-	&rest)
+        (con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
+        &rest)
 
 (defun* console-get-height-rect ((con console) (x ucoord) (y ucoord)
                                  (w ucoord) (h ucoord) (fmt string) &rest args)
   (assert (legal-console-coordinates? con x y))
   (%console-get-height-rect con x y w h (apply #'format nil fmt args)))
 
-;;TCODLIB_API int TCOD_console_height_left_rect(TCOD_console_t con,
-;;     int x, int y, int w, int h, const char *fmt, ...);
-
-;; (defcfun ("TCOD_console_height_left_rect" %console-height-left-rect) :int
-;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
-;; 	&rest)
-;;
-;; (defun* console-height-left-rect ((con console) (x ucoord) (y ucoord)
-;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-height-left-rect con x y w h (apply #'format nil fmt args)))
-
-;;TCODLIB_API int TCOD_console_height_right_rect(TCOD_console_t con,
-;;     int x, int y, int w, int h, const char *fmt, ...);
-
-;; (defcfun ("TCOD_console_height_right_rect" %console-height-right-rect) :int
-;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
-;; 	&rest)
-;;
-;; (defun* console-height-right-rect ((con console) (x ucoord) (y ucoord)
-;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-height-right-rect con x y w h (apply #'format nil fmt args)))
-
-;;TCODLIB_API int TCOD_console_height_center_rect(TCOD_console_t con,
-;;     int x, int y, int w, int h, const char *fmt, ...);
-
-;; (defcfun ("TCOD_console_height_center_rect" %console-height-centre-rect) :int
-;; 	(con console) (x :int) (y :int) (w :int) (h :int) (fmt :string)
-;; 	&rest)
-;;
-;; (defun* console-height-centre-rect ((con console) (x ucoord) (y ucoord)
-;;                                  (w ucoord) (h ucoord) (fmt string) &rest args)
-;;   (assert (legal-console-coordinates? con x y))
-;;   (%console-height-centre-rect con x y w h (apply #'format nil fmt args)))
-;;
-;; (declaim (inline console-height-center-rect))
-;; (defun console-height-center-rect (con x y w h fmt &rest args)
-;;   (apply #'console-height-centre-rect con x y w h fmt args))
-
-
-;;TCODLIB_API void TCOD_console_hline(TCOD_console_t con,int x,int y, int l,
-;; TCOD_bkgnd_flag_t flag);
 
 (define-c-function ("TCOD_console_hline" console-hline) :void
     ((con console) (x :int) (y :int) (len :int) (flag background-flag))
@@ -1765,18 +1998,11 @@ value (#xRRGGBB)."
   (call-it))
 
 
-;;TCODLIB_API void TCOD_console_vline(TCOD_console_t con,int x,int y, int l,
-;; TCOD_bkgnd_flag_t flag);
-
 (define-c-function ("TCOD_console_vline" console-vline) :void
     ((con console) (x :int) (y :int) (len :int) (flag background-flag))
   (assert (legal-console-coordinates? con x y))
   (call-it))
 
-
-;;TCODLIB_API void TCOD_console_print_frame(TCOD_console_t con,int x,int y,
-;; int w,int h, bool empty, const char *fmt, ...);
-;;#-libtcod-old
 (defcfun ("TCOD_console_print_frame" %console-print-frame) :void
   (con console) (x :int) (y :int) (width :int) (height :int)
   (empty? :boolean) (flag background-flag)
@@ -1829,7 +2055,7 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_fading_color();
 (define-c-function ("TCOD_console_get_fading_color_wrapper"
-	  console-get-fading-color) colournum
+          console-get-fading-color) colournum
     ())
 (declaim (inline console-get-fading-colour))
 (defun console-get-fading-colour ()
@@ -1845,7 +2071,7 @@ value (#xRRGGBB)."
 ;;     TCOD_color_t fore, TCOD_color_t back);
 ;; This is to do with "colour control" strings
 (define-c-function ("TCOD_console_set_color_control_wrapper"
-	  console-set-colour-control) :void
+          console-set-colour-control) :void
   ((control-num colctrl) (fore colournum) (back colournum)))
 
 (declaim (inline console-set-color-control))
@@ -1863,13 +2089,6 @@ value (#xRRGGBB)."
     (setf (gethash newcon *console-width-table*) width)
     (setf (gethash newcon *console-height-table*) height)
     newcon))
-
-
-;; (defun* (console-new -> console) ((width ucoord) (height ucoord))
-;;   (let ((newcon (%console-new width height)))
-;;     (setf (gethash newcon *console-width-table*) width)
-;;     (setf (gethash newcon *console-height-table*) height)
-;;     newcon))
 
 
 ;;TCODLIB_API int TCOD_console_get_width(TCOD_console_t con);
@@ -1928,43 +2147,105 @@ value (#xRRGGBB)."
 
 
 
-
-;; (defun* console-blit ((src console)
-;;                       (xsrc fixnum) (ysrc fixnum) (wsrc fixnum) (hsrc fixnum)
-;;                       (dest console)
-;;                       (xdest fixnum) (ydest fixnum)
-;;                       (foreground-alpha float) (background-alpha float))
-;;   (check-type xsrc (integer 0))
-;;   (check-type ysrc (integer 0))
-;;   (check-type wsrc (integer 0))
-;;   (check-type hsrc (integer 0))
-;;   (check-type xdest (integer 0))
-;;   (check-type ydest (integer 0))
-;;   (check-type foreground-alpha (real 0 1.0))
-;;   (check-type background-alpha (real 0 1.0))
-;;   ;; Blitting a console to a position that lies completely outside the
-;;   ;; destination console's bounds will do nothing, rather than causing
-;;   ;; an error.
-;;   (unless (or (>= xdest (console-get-width dest))
-;;               (>= ydest (console-get-height dest)))
-;;     ;; TCOD_console_blit unceremoniously crashes libtcod if this assertion
-;;     ;; is not true when it is called. We therefore check the assertion here
-;;     ;; first, so we have access to debugging facilities if the conditions
-;;     ;; are not met.
-;;     (assert (and (plusp wsrc) (plusp hsrc)
-;;                  (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
-;;     (%console-blit src xsrc ysrc wsrc hsrc dest xdest ydest
-;;                    foreground-alpha background-alpha)))
-
-
 ;;TCODLIB_API void TCOD_console_delete(TCOD_console_t console);
 (define-c-function ("TCOD_console_delete" console-delete) :void
     ((con console)))
 
 
-;; void TCOD_console_set_key_color(TCOD_console_t con,TCOD_color_t col);
-;; (define-c-function ("TCOD_console_set_key_color" console-set-key-color) :void
-;;     ((con console)))
+#+nil
+(define-c-function ("TCOD_console_set_key_color_wrapper" console-set-key-colour) :void
+    ((con console) (colour colournum)))
+
+
+;;;; <<Unicode>> ==============================================================
+
+
+
+(define-c-function ("TCOD_console_map_string_to_font_utf"
+                    %console-map-string-to-font-utf) :void
+    ((str :string) (fontchar-x :int) (fontchar-y :int)))
+
+
+(defun* console-map-string-to-font-utf ((str string) (fontchar-x uint)
+                                        (fontchar-y uint))
+  (with-foreign-pointer-as-string (strbuf (length str))
+    (%console-map-string-to-font-utf
+     (lisp-string-to-foreign str strbuf (length str)
+                             :encoding :utf-16)
+     fontchar-x fontchar-y)))
+
+
+(defcfun ("TCOD_console_print_utf" %console-print-utf) :void
+  (con console) (x :int) (y :int) (fmt :string) &rest)
+
+(defun* console-print-utf ((con console) (x ucoord) (y ucoord)
+                           (fmt string) &rest args)
+  (let ((str (apply #'format nil fmt args)))
+    (with-foreign-pointer-as-string (strbuf (length str))
+      (%console-print-utf con x y
+                          (lisp-string-to-foreign str strbuf (length str)
+                                                  :encoding :utf-16)))))
+
+
+(defcfun ("TCOD_console_print_ex_utf" %console-print-ex-utf) :void
+  (con console) (x :int) (y :int) (flag background-flag) (align alignment)
+  (fmt :string) &rest)
+
+
+(defun* console-print-ex-utf ((con console) (x ucoord) (y ucoord)
+                              (flag background-flag) (align alignment)
+                              (fmt string) &rest args)
+  (let ((str (apply #'format nil fmt args)))
+    (with-foreign-pointer-as-string (strbuf (length str))
+      (%console-print-ex-utf con x y flag align
+                             (lisp-string-to-foreign str strbuf (length str)
+                                                     :encoding :utf-16)))))
+
+
+(defcfun ("TCOD_console_print_rect_utf" %console-print-rect-utf) :void
+  (con console) (x :int) (y :int) (w :int) (h :int)
+  (fmt :string) &rest)
+
+
+(defun* console-print-rect-utf ((con console) (x ucoord) (y ucoord)
+                                (w ucoord) (h ucoord)
+                                (fmt string) &rest args)
+  (let ((str (apply #'format nil fmt args)))
+    (with-foreign-pointer-as-string (strbuf (length str))
+      (%console-print-rect-utf con x y w h
+                               (lisp-string-to-foreign str strbuf (length str)
+                                                       :encoding :utf-16)))))
+
+
+(defcfun ("TCOD_console_print_rect_ex_utf" %console-print-rect-ex-utf) :void
+  (con console) (x :int) (y :int) (w :int) (h :int)
+  (flag background-flag) (align alignment) (fmt :string) &rest)
+
+
+(defun* console-print-rect-ex-utf ((con console) (x ucoord) (y ucoord)
+                                   (w ucoord) (h ucoord)
+                                   (flag background-flag) (align alignment)
+                                   (fmt string) &rest args)
+  (let ((str (apply #'format nil fmt args)))
+    (with-foreign-pointer-as-string (strbuf (length str))
+      (%console-print-rect-ex-utf con x y w h flag align
+                                  (lisp-string-to-foreign str strbuf (length str)
+                                                          :encoding :utf-16)))))
+
+
+(defcfun ("TCOD_console_get_height_rect_utf" %console-get-height-rect-utf) :void
+  (con console) (x :int) (y :int) (w :int) (h :int)
+  (fmt :string) &rest)
+
+
+(defun* console-get-height-rect-utf ((con console) (x ucoord) (y ucoord)
+                                     (w ucoord) (h ucoord)
+                                     (fmt string) &rest args)
+  (let ((str (apply #'format nil fmt args)))
+    (with-foreign-pointer-as-string (strbuf (length str))
+      (%console-get-height-rect-utf con x y w h
+                                    (lisp-string-to-foreign str strbuf (length str)
+                                                            :encoding :utf-16)))))
 
 
 
@@ -1974,13 +2255,13 @@ value (#xRRGGBB)."
 ;; (defun key->keypress (keyptr)
 ;;   (let ((flags (foreign-slot-value keyptr 'key-press 'flags)))
 ;;     (make-key :vk (foreign-slot-value keyptr 'key-press 'vk)
-;; 	      :c (code-char (foreign-slot-value keyptr 'key-press 'c))
-;; 	      :pressed (get-bit flags 1)
-;; 	      :lalt (get-bit flags 2)
-;; 	      :lctrl (get-bit flags 3)
-;; 	      :ralt (get-bit flags 4)
-;; 	      :rctrl (get-bit flags 5)
-;; 	      :shift (get-bit flags 6))))
+;;            :c (code-char (foreign-slot-value keyptr 'key-press 'c))
+;;            :pressed (get-bit flags 1)
+;;            :lalt (get-bit flags 2)
+;;            :lctrl (get-bit flags 3)
+;;            :ralt (get-bit flags 4)
+;;            :rctrl (get-bit flags 5)
+;;            :shift (get-bit flags 6))))
 
 (defmacro and& (a b)
   "Shorthand for (BOOLE 'BOOLE-AND A B)."
@@ -1996,12 +2277,12 @@ value (#xRRGGBB)."
   (let ((flags (ash key-bf -24)))
     (make-key :vk (key-bitfield->vk key-bf) ;;(ldb (byte 8 16) key-bf)
               :c (code-char (and& key-bf #x0000FFFF))  ;;(ldb (byte 16 0) key-bf)
-	      :pressed (get-bit flags 1)
-	      :lalt (get-bit flags 2)
-	      :lctrl (get-bit flags 3)
-	      :ralt (get-bit flags 4)
-	      :rctrl (get-bit flags 5)
-	      :shift (get-bit flags 6))))
+              :pressed (get-bit flags 1)
+              :lalt (get-bit flags 2)
+              :lctrl (get-bit flags 3)
+              :ralt (get-bit flags 4)
+              :rctrl (get-bit flags 5)
+              :shift (get-bit flags 6))))
 
 
 ;;TCODLIB_API TCOD_key_t TCOD_console_check_for_keypress(int flags);
@@ -2063,31 +2344,156 @@ value (#xRRGGBB)."
   ((code keycode)))
 
 
+;;;; <<Name generation>> ======================================================
+
+
+(define-c-function ("TCOD_namegen_parse" namegen-parse) :void
+    ((filename :string) (rng randomptr)))
+
+(define-c-function ("TCOD_namegen_generate" namegen-generate) :string
+    ((name :string) (allocate? :boolean)))
+
+(define-c-function ("TCOD_namegen_generate_custom" namegen-generate-custom) :string
+    ((name :string) (rule :string) (allocate? :boolean)))
+
+(define-c-function ("TCOD_namegen_destroy" namegen-destroy) :void
+    ())
+
+
+;;;; <<Compression toolkit>> ==================================================
+
+
+(define-c-function ("TCOD_zip_new" zip-new) zipptr
+    ())
+
+(define-c-function ("TCOD_zip_delete" zip-delete) :void
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_put_char" zip-put-char) :void
+    ((zip zipptr) (ch :char)))
+
+(define-c-function ("TCOD_zip_put_int" zip-put-int) :void
+    ((zip zipptr) (val :int)))
+
+(define-c-function ("TCOD_zip_put_float" zip-put-float) :void
+    ((zip zipptr) (val :float)))
+
+(define-c-function ("TCOD_zip_put_string" zip-put-string) :void
+    ((zip zipptr) (val :string)))
+
+(define-c-function ("TCOD_zip_put_data" zip-put-data) :void
+    ((zip zipptr) (nbytes :int) (data :pointer)))
+
+(define-c-function ("TCOD_zip_put_image" zip-put-image) :void
+    ((zip zipptr) (image image)))
+
+(define-c-function ("TCOD_zip_put_console" zip-put-console) :void
+    ((zip zipptr) (con console)))
+
+(defun zip-put (zip val)
+  (typecase val
+    (string (zip-put-string zip val))
+    (character (zip-put-char zip val))
+    (integer (zip-put-int zip val))
+    (float (zip-put-float zip val))
+    (otherwise (error "ZIP-PUT: don't know how to translate value ~S" val))))
+
+(defun* zip-put-colour (zip (colour colournum))
+  (multiple-value-bind (r g b) (decompose-colour colour)
+    (zip-put-char zip (code-char r))
+    (zip-put-char zip (code-char g))
+    (zip-put-char zip (code-char b))))
+
+(declaim (inline zip-put-color))
+(defun zip-put-color (zip color)
+  (zip-put-colour zip color))
+
+(define-c-function ("TCOD_zip_save_to_file" zip-save-to-file) :int
+    ((zip zipptr) (filename :string)))
+
+(define-c-function ("TCOD_zip_load_from_file" zip-load-from-file) :int
+    ((zip zipptr) (filename :string)))
+
+(define-c-function ("TCOD_zip_get_char" zip-get-char) :char
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_get_int" zip-get-int) :int
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_get_float" zip-get-float) :float
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_get_string" zip-get-string) :string
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_get_data" zip-get-data) :int
+    ((zip zipptr) (nbytes :int) (data :pointer)))
+
+(define-c-function ("TCOD_zip_get_image" zip-get-image) image
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_get_console" zip-get-console) console
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_get_current_bytes" zip-get-current-bytes) :uint32
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_get_remaining_bytes"
+                    zip-get-remaining-bytes) :uint32
+    ((zip zipptr)))
+
+(define-c-function ("TCOD_zip_skip_bytes" zip-skip-bytes) :void
+    ((zip zipptr) (nbytes :uint32)))
+
+
+(defun* zip-get-colour ((zip zipptr))
+  (let ((r (char-code (zip-get-char zip)))
+        (g (char-code (zip-get-char zip)))
+        (b (char-code (zip-get-char zip))))
+    (compose-colour r g b)))
+
+(declaim (inline zip-get-color))
+(defun zip-get-color (zip)
+  (zip-get-colour zip))
+
+
 ;;;; <<System>> ===============================================================
 
 
-;;TCODLIB_API uint32 TCOD_sys_elapsed_milli();
-;;TCODLIB_API float TCOD_sys_elapsed_seconds();
-;;TCODLIB_API void TCOD_sys_sleep_milli(uint32 val);
+(define-c-function ("TCOD_sys_create_directory" sys-create-directory) :boolean
+    ((path :string)))
+
+(define-c-function ("TCOD_sys_delete_directory" sys-delete-directory) :boolean
+    ((path :string)))
+
+(define-c-function ("TCOD_sys_elapsed_milli" sys-elapsed-milli) :uint32
+    ())
+
+(define-c-function ("TCOD_sys_elapsed_seconds" sys-elapsed-seconds) :float
+    ())
+
+(define-c-function ("TCOD_sys_get_last_frame_length"
+                    sys-get-last-frame-length) :float
+    ())
+
 (define-c-function ("TCOD_sys_sleep_milli" sys-sleep-milli) :void
     ((val :unsigned-int)))
 
-;;TCODLIB_API void TCOD_sys_save_screenshot(const char *filename);
 (defcfun ("TCOD_sys_save_screenshot" %sys-save-screenshot) :void
   (filename :string))
 
 (defun sys-save-screenshot (&optional (filename (null-pointer)))
   (%sys-save-screenshot filename))
 
-;;TCODLIB_API void TCOD_sys_force_fullscreen_resolution(int width, int height);
-;;TCODLIB_API void TCOD_sys_set_fps(int val);
 (define-c-function ("TCOD_sys_set_fps" sys-set-fps) :void
     ((val :int)))
 
-;;TCODLIB_API int TCOD_sys_get_fps();
 (define-c-function ("TCOD_sys_get_fps" sys-get-fps) :int
     ())
 
+(define-c-function ("TCOD_sys_register_SDL_renderer"
+                    sys-register-SDL-renderer) :void
+    ((callback :pointer)))
 
 ;; Lisp wrapper needed because actual function returns nothing, whereas we
 ;; want to return resolution.
@@ -2098,6 +2504,48 @@ value (#xRRGGBB)."
   (values (sys-get-current-resolution-x)
           (sys-get-current-resolution-y)))
 
+(define-c-function ("TCOD_sys_force_fullscreen_resolution"
+                    sys-force-fullscreen-resolution) :void
+    ((width :int) (height :int)))
+
+(define-c-function ("TCOD_sys_get_renderer" sys-get-renderer) renderer
+    ()
+  "Return the currently active renderer.")
+
+
+(define-c-function ("TCOD_sys_set_renderer" sys-set-renderer) :void
+    ((renderer renderer))
+  "Change the currently active renderer.")
+
+
+(defcfun ("TCOD_sys_get_char_size" %sys-get-char-size) :void
+  (widthptr :pointer) (heightptr :pointer))
+
+(defun* (sys-get-char-size -> (values fixnum fixnum)) ()
+  "Return the dimensions of each character in the current font bitmap."
+  (with-foreign-object (width :int)
+    (with-foreign-object (height :int)
+      (%sys-get-char-size width height)
+      (values (mem-aref width :int) (mem-aref height :int)))))
+
+(defcfun ("TCOD_sys_get_fullscreen_offsets"
+          %sys-get-fullscreen-offsets) :void
+  (offx-ptr :pointer) (offy-ptr :pointer))
+
+(defun* (sys-get-fullscreen-offsets -> (values fixnum fixnum)) ()
+  (with-foreign-object (offx :int)
+    (with-foreign-object (offy :int)
+      (%sys-get-fullscreen-offsets offx offy)
+      (values (mem-aref offx :int) (mem-aref offy :int)))))
+
+(define-c-function ("TCOD_sys_clipboard_set" sys-clipboard-set) :void
+    ((text :string)))
+
+(define-c-function ("TCOD_sys_clipboard_get" sys-clipboard-get) :string
+    ())
+
+(define-c-function ("TCOD_sys_update_char" sys-update-char) :void
+    ((ascii :int) (fontx :int) (fonty :int) (image image) (x :int) (y :int)))
 
 
 ;;;; <<Random>> ===============================================================
@@ -2105,30 +2553,45 @@ value (#xRRGGBB)."
 
 ;;; mersenne.h
 
-;;TCODLIB_API TCOD_random_t TCOD_random_get_instance();
-;;TCODLIB_API TCOD_random_t TCOD_random_new();
 (define-c-function ("TCOD_random_new" random-new) randomptr
   ((algorithm rng-algorithm)))
+
 (define-c-function ("TCOD_random_new_from_seed" random-new-from-seed) randomptr
   ((algorithm rng-algorithm) (seed :uint32)))
+
 (define-c-function ("TCOD_random_get_instance" random-get-instance) randomptr
     ())
+
 (define-c-function ("TCOD_random_delete" random-delete) :void
   ((rng randomptr)))
 
-;;TCODLIB_API TCOD_random_t TCOD_random_new_from_seed(uint32 seed);
-;;TCODLIB_API int TCOD_random_get_int(TCOD_random_t mersenne, int min, int max);
+(define-c-function ("TCOD_random_save" random-save) randomptr
+  ((rng randomptr)))
+
+(define-c-function ("TCOD_random_restore" random-restore) :void
+  ((rng randomptr) (backup randomptr)))
+
+(define-c-function ("TCOD_random_set_distribution" random-set-distribution) :void
+  ((rng randomptr) (dist rng-distribution)))
+
 (define-c-function ("TCOD_random_get_int" random-get-int) :int
   ((rng randomptr) (min :int) (max :int)))
 
-;;TCODLIB_API float TCOD_random_get_float(TCOD_random_t mersenne, float min,
-;;   float max);
 (define-c-function ("TCOD_random_get_float" random-get-float) :float
   ((rng randomptr) (min :float) (max :float)))
 
-;;TCODLIB_API int TCOD_random_get_int_from_byte_array(int min, int max,
-;;   const char *data,int len);
-;;TCODLIB_API void TCOD_random_delete(TCOD_random_t mersenne);
+(define-c-function ("TCOD_random_get_double" random-get-double) :double
+  ((rng randomptr) (min :double) (max :double)))
+
+(define-c-function ("TCOD_random_get_int_mean" random-get-int-mean) :int
+  ((rng randomptr) (min :int) (max :int) (mean :int)))
+
+(define-c-function ("TCOD_random_get_float_mean" random-get-float-mean) :float
+  ((rng randomptr) (min :float) (max :float) (mean :float)))
+
+(define-c-function ("TCOD_random_get_double_mean" random-get-double-mean) :double
+  ((rng randomptr) (min :double) (max :double) (mean :double)))
+
 
 
 ;;;; <<Mouse>> ================================================================
@@ -2215,9 +2678,13 @@ value (#xRRGGBB)."
 
 
 
-;;TCODLIB_API void TCOD_mouse_show_cursor(bool visible);
-;;TCODLIB_API bool TCOD_mouse_is_cursor_visible();
-;;TCODLIB_API void TCOD_mouse_move(int x, int y);
+(define-c-function ("TCOD_mouse_show_cursor" mouse-show-cursor) :void
+  ((visible? :boolean)))
+
+(define-c-function ("TCOD_mouse_is_cursor_visible"
+                    mouse-is-cursor-visible?) :boolean
+  ())
+
 (define-c-function ("TCOD_mouse_move" mouse-move) :void
   ((pixel-x :int) (pixel-y :int)))
 
@@ -2234,6 +2701,12 @@ value (#xRRGGBB)."
   ((width :int) (height :int))
   "Return a new image, filled with black.")
 
+(define-c-function ("TCOD_image_refresh_console" image-refresh-console) :void
+  ((image image) (con console)))
+
+(define-c-function ("TCOD_image_delete" image-delete) :void
+  ((image image)))
+
 ;;TCODLIB_API TCOD_image_t TCOD_image_from_console(TCOD_console_t console);
 (define-c-function ("TCOD_image_from_console" image-from-console) image
   ((con console))
@@ -2245,8 +2718,21 @@ console =CON=.")
   ((filename :string))
   "Read an image from a file and return it.")
 
+(define-c-function ("TCOD_image_invert" image-invert) :void
+  ((image image)))
 
-;;TCODLIB_API void TCOD_image_clear(TCOD_image_t image, TCOD_color_t color);
+(define-c-function ("TCOD_image_hflip" image-hflip) :void
+  ((image image)))
+
+(define-c-function ("TCOD_image_vflip" image-vflip) :void
+  ((image image)))
+
+(define-c-function ("TCOD_image_rotate90" image-rotate90) :void
+  ((image image) (num-rotations :int)))
+
+(define-c-function ("TCOD_image_scale" image-scale) :void
+  ((image image) (new-width :int) (new-height :int)))
+
 (define-c-function ("TCOD_image_clear_wrapper" image-clear) :void
   ((image image) (colour colournum))
   "Fill the image =IMAGE= with the colour =COLOUR=.")
@@ -2268,7 +2754,7 @@ or =.PNG=.")
 ;;TCODLIB_API TCOD_color_t TCOD_image_get_mipmap_pixel(TCOD_image_t image,
 ;; float x0,float y0, float x1, float y1);
 (define-c-function ("TCOD_image_get_mipmap_pixel_wrapper"
-	  image-get-mipmap-pixel) colournum
+          image-get-mipmap-pixel) colournum
   ((image image) (x0 :float) (y0 :float) (x1 :float) (y1 :float))
   "Calculate the interpolated colour of the pixel at =(PIXEL-X, PIXEL-Y)=
 in =IMAGE=.")
@@ -2282,7 +2768,7 @@ in =IMAGE=.")
 
 ;;TCODLIB_API void TCOD_image_blit(TCOD_image_t image, TCOD_console_t console,
 ;; float x, float y,
-;;	TCOD_bkgnd_flag_t bkgnd_flag, float scalex, float scaley, float angle);
+;;      TCOD_bkgnd_flag_t bkgnd_flag, float scalex, float scaley, float angle);
 (define-c-function ("TCOD_image_blit" image-blit) :void
     ((image image) (con console) (x :int) (y :int) (flag background-flag)
      (scalex :float) (scaley :float) (angle :float))
@@ -2292,12 +2778,17 @@ in =IMAGE=.")
 
 ;;TCODLIB_API void TCOD_image_blit_rect(TCOD_image_t image,
 ;; TCOD_console_t console, int x, int y, int w, int h,
-;;	TCOD_bkgnd_flag_t bkgnd_flag);
+;;      TCOD_bkgnd_flag_t bkgnd_flag);
 (define-c-function ("TCOD_image_blit_rect" image-blit-rect) :void
     ((image image) (con console) (x :int) (y :int) (width :int) (height :int)
      (flag background-flag))
   (assert (legal-console-coordinates? con x y))
   (call-it))
+
+
+(define-c-function ("TCOD_image_blit_2x" image-blit-2x) :void
+    ((image image) (dest console) (dx :int) (dy :int) (sx :int) (sy :int)
+     (width :int) (height :int)))
 
 
 ;;TCODLIB_API void TCOD_image_delete(TCOD_image_t image);
@@ -2310,9 +2801,30 @@ in =IMAGE=.")
   (image-set-key-color image key-colour))
 
 
-;;TCODLIB_API bool TCOD_image_is_pixel_transparent(TCOD_image_t image, int x,
-;;  int y);
+(defcfun ("TCOD_image_get_size" %image-get-size) :void
+  (image image) (widthptr :pointer) (heightptr :pointer))
 
+
+(defun* (image-get-width -> uint32) ((image image))
+  (with-foreign-object (width :int)
+    (with-foreign-object (height :int)
+      (%image-get-size image width height)
+      (mem-aref width :int))))
+
+
+(defun* (image-get-height -> uint32) ((image image))
+  (with-foreign-object (width :int)
+    (with-foreign-object (height :int)
+      (%image-get-size image width height)
+      (mem-aref height :int))))
+
+
+(define-c-function ("TCOD_image_get_alpha" image-get-alpha) :int
+  ((image image) (x :int) (y :int)))
+
+(define-c-function ("TCOD_image_is_pixel_transparent"
+                    image-is-pixel-transparent?) :boolean
+  ((image image) (x :int) (y :int)))
 
 
 ;;;; <<Noise>> ================================================================
@@ -2424,106 +2936,106 @@ using noise type NOISE-TYPE."
 
 
 
-(define-c-function ("TCOD_heightmap_new" heightmap-new) heightmap
+(define-c-function ("TCOD_heightmap_new" heightmap-new) heightmap-ptr
   ((width :int) (height :int))
   "Return a new heightmap with the given dimensions.")
 
 
 (define-c-function ("TCOD_heightmap_get_value" heightmap-get-value) :float
   ;; 0 <= x < WIDTH
-  ((heightmap heightmap) (x :int) (y :int))
+  ((heightmap heightmap-ptr) (x :int) (y :int))
   "Return the height at position =(X, Y)= in the heightmap.")
 
 
 (define-c-function ("TCOD_heightmap_get_interpolated_value"
           heightmap-get-interpolated-value) :float
   ;; 0 <= x < WIDTH
-  ((heightmap heightmap) (x :float) (y :float))
+  ((heightmap heightmap-ptr) (x :float) (y :float))
   "Calculate the height at position =(X, Y)= in the heightmap, where the
 coordinates might not be integers.")
 
 
 (define-c-function ("TCOD_heightmap_get_slope" heightmap-get-slope) :float
-  ((heightmap heightmap) (x :int) (y :int))
+  ((heightmap heightmap-ptr) (x :int) (y :int))
   "Return the slope at position =(X, Y)= in the heightmap. The value returned
 will be between 0 and pi/2.")
 
 
 (define-c-function ("TCOD_heightmap_set_value" heightmap-set-value) :void
   ;; 0 <= x < WIDTH
-  ((heightmap heightmap) (x :int) (y :int) (value :float))
+  ((heightmap heightmap-ptr) (x :int) (y :int) (value :float))
   "Set the height at position =(X, Y)= in the heightmap to =VALUE=.")
 
 
 (define-c-function ("TCOD_heightmap_add" heightmap-add) :void
-  ((heightmap heightmap) (value :float))
+  ((heightmap heightmap-ptr) (value :float))
   "Add =VALUE= to all heights in the heightmap.")
 
 
 (define-c-function ("TCOD_heightmap_add_fbm" heightmap-add-fbm) :void
-    ((heightmap heightmap) (noise noise) (mulx :float) (muly :float)
+    ((heightmap heightmap-ptr) (noise noise) (mulx :float) (muly :float)
      (addx :float) (addy :float) (octaves :float) (delta :float) (scale :float))
   "Add values from the random noise object =NOISE= to all heights in
 equivalent positions in =HEIGHTMAP=.")
 
 
 (define-c-function ("TCOD_heightmap_scale" heightmap-scale) :void
-  ((heightmap heightmap) (factor :float))
+  ((heightmap heightmap-ptr) (factor :float))
   "Multiply all the heights in the heightmap by =SCALE=.")
 
 
-(define-c-function ("TCOD_heightmap_lerp_hm" heightmap-lerp) :void
-  ((hm1 heightmap) (hm2 heightmap) (result heightmap) (coef :float))
+(define-c-function ("TCOD_heightmap_lerp_hm" heightmap-lerp-hm) :void
+  ((hm1 heightmap-ptr) (hm2 heightmap-ptr) (result heightmap-ptr) (coef :float))
   "Fill the heightmap =RESULT= with the results of a lerp operation between
 the two heightmaps =HM1= and =HM2=.")
 
 
 (define-c-function ("TCOD_heightmap_add_hm" heightmap-add-hm) :void
-  ((hm1 heightmap) (hm2 heightmap) (result heightmap))
+  ((hm1 heightmap-ptr) (hm2 heightmap-ptr) (result heightmap-ptr))
   "Add the heights in =HM1= to heights in equivalent positions in
 =HM2=, and store the results in the heightmap =RESULT=.")
 
 
 (define-c-function ("TCOD_heightmap_multiply_hm" heightmap-multiply-hm) :void
-  ((hm1 heightmap) (hm2 heightmap) (result heightmap))
+  ((hm1 heightmap-ptr) (hm2 heightmap-ptr) (result heightmap-ptr))
   "Multiply the heights in =HM1= by the heights in equivalent positions in
 =HM2=, and store the results in the heightmap =RESULT=.")
 
 
 (define-c-function ("TCOD_heightmap_clear" heightmap-clear) :void
-  ((heightmap heightmap))
+  ((heightmap heightmap-ptr))
   "Set all the heights in the heightmap to zero.")
 
 
 (define-c-function ("TCOD_heightmap_delete" heightmap-delete) :void
-  ((heightmap heightmap))
+  ((heightmap heightmap-ptr))
   "Destroy the heightmap object =HEIGHTMAP=.")
 
 
 (define-c-function ("TCOD_heightmap_clamp" heightmap-clamp) :void
-  ((heightmap heightmap) (min :float) (max :float))
+  ((heightmap heightmap-ptr) (min :float) (max :float))
   "If any height in =HEIGHTMAP= is below =MIN= or above =MAX=, set it
 equal to =MIN= or =MAX= respectively.")
 
 
 (define-c-function ("TCOD_heightmap_count_cells" heightmap-count-cells) :int
-  ((heightmap heightmap) (min :float) (max :float))
+  ((heightmap heightmap-ptr) (min :float) (max :float))
   "Return the number of cells in =HEIGHTMAP= which contain heights between
 =MIN= and =MAX=.")
 
 
 (define-c-function ("TCOD_heightmap_has_land_on_border"
                     heightmap-has-land-on-border?) :boolean
-  ((heightmap heightmap) (waterlevel :float))
+  ((heightmap heightmap-ptr) (waterlevel :float))
   "Return true if any of the border cells of =HEIGHTMAP= have heights greater
 than =WATERLEVEL=.")
 
 
 (defcfun ("TCOD_heightmap_get_minmax" %heightmap-get-minmax) :void
-  (heightmap heightmap) (minfloat :pointer) (maxfloat :pointer))
+  (heightmap heightmap-ptr) (minfloat :pointer) (maxfloat :pointer))
 
 
-(defun* (heightmap-get-min -> float) ((heightmap heightmap))
+(defun* (heightmap-get-min -> float) ((heightmap heightmap-ptr))
   "Return the lowest height in =HEIGHTMAP=."
   (with-foreign-object (minf :float)
     (with-foreign-object (maxf :float)
@@ -2531,7 +3043,7 @@ than =WATERLEVEL=.")
       (mem-aref minf :float))))
 
 
-(defun* (heightmap-get-max -> float) ((heightmap heightmap))
+(defun* (heightmap-get-max -> float) ((heightmap heightmap-ptr))
   "Return the highest height in =HEIGHTMAP=."
   (with-foreign-object (minf :float)
     (with-foreign-object (maxf :float)
@@ -2541,7 +3053,7 @@ than =WATERLEVEL=.")
 
 
 (define-c-function ("TCOD_heightmap_normalize" heightmap-normalize) :void
-  ((heightmap heightmap) (min :float) (max :float))
+  ((heightmap heightmap-ptr) (min :float) (max :float))
   "Scale all the heights in =HEIGHTMAP= so that the lowest is equal to
 =MIN= and the highest is equal to =MAX=.")
 
@@ -2552,16 +3064,16 @@ than =WATERLEVEL=.")
 
 
 (define-c-function ("TCOD_heightmap_copy" heightmap-copy) :void
-  ((source heightmap) (dest heightmap))
+  ((source heightmap-ptr) (dest heightmap-ptr))
   "Copy the heightmap =SOURCE= into the heightmap object =DEST=.")
 
 
 (defcfun ("TCOD_heightmap_rain_erosion" %heightmap-rain-erosion) :void
-  (heightmap heightmap) (num-drops :int) (erosion-coef :float)
+  (heightmap heightmap-ptr) (num-drops :int) (erosion-coef :float)
   (sediment-coef :float) (randomptr :pointer))
 
 
-(defun* heightmap-rain-erosion ((heightmap heightmap) (num-drops fixnum)
+(defun* heightmap-rain-erosion ((heightmap heightmap-ptr) (num-drops fixnum)
                                 (erosion-coef float)
                                 (sedimentation-coef float)
                                &optional ((rng randomptr) +NULL+))
@@ -2572,11 +3084,11 @@ random locations."
 
 
 (defcfun ("TCOD_heightmap_dig_bezier" %heightmap-dig-bezier) :void
-  (heightmap heightmap) (px :pointer) (py :pointer) (start-radius :float)
+  (heightmap heightmap-ptr) (px :pointer) (py :pointer) (start-radius :float)
   (start-depth :float) (end-radius :float) (end-depth :float))
 
 
-(defun* heightmap-dig-bezier ((heightmap heightmap) (coords list)
+(defun* heightmap-dig-bezier ((heightmap heightmap-ptr) (coords list)
                               (start-radius float) (start-depth float)
                               (end-radius float) (end-depth float))
   "Carve a path through =HEIGHTMAP= using a cubic Bezier curve."
@@ -2592,12 +3104,96 @@ random locations."
                              end-radius end-depth))))
 
 
-(defun* heightmap-dig-line ((heightmap heightmap)
+(defun* heightmap-dig-line ((heightmap heightmap-ptr)
                             (x1 fixnum) (y1 fixnum)
                             (x2 fixnum) (y2 fixnum) (radius float)
                             (depth float))
   (heightmap-dig-bezier heightmap `((,x1 . ,y1) (,x1 . ,y1) (,x2 . ,y2) (,x2 . ,y2))
                         radius depth radius depth))
+
+
+(define-c-function ("TCOD_heightmap_add_hill" heightmap-add-hill) :void
+  ((heightmap heightmap-ptr) (hx :float) (hy :float)
+   (hradius :float) (hheight :float)))
+
+(define-c-function ("TCOD_heightmap_dig_hill" heightmap-dig-hill) :void
+  ((heightmap heightmap-ptr) (hx :float) (hy :float)
+   (hradius :float) (hheight :float)))
+
+
+(define-c-function ("TCOD_heightmap_kernel_transform"
+                    %heightmap-kernel-transform) :void
+  ((heightmap heightmap-ptr) (kernel-size :int)
+   (dx-ptr :pointer) (dy-ptr :pointer)
+   (weight-ptr :pointer) (min-level :float) (max-level :float)))
+
+
+(defun* heightmap-kernel-transform ((heightmap heightmap-ptr)
+                                    (coords list) (weights list)
+                                    (min-level single-float)
+                                    (max-level single-float))
+  "* Arguments:
+- HEIGHTMAP :: pointer to a heightmap object.
+- COORDS :: a list of (X . Y) cons cells specifying coordinates relative to the
+cell being processed. For example (-1 . 0) is the cell to the west, (0 . 1) is the
+cell to the south, etc.
+- WEIGHTS :: a list of factors by which to scale the values in processed cells.
+The list must be the same length as COORDS.
+- MIN-LEVEL, MAX-LEVEL :: Cells are only processed if their values lies within
+these limits."
+  (assert (= (length coords) (length weights)))
+  (let ((ksize (length coords)))
+    (with-foreign-objects ((dx-array :int ksize)
+                           (dy-array :int ksize)
+                           (weight-array :float ksize))
+      (dotimes (i ksize)
+        (setf (mem-aref dx-array :int i) (car (nth i coords))
+              (mem-aref dx-array :int i) (cdr (nth i coords))
+              (mem-aref weight-array :float i) (nth i weights)))
+      (%heightmap-kernel-transform heightmap ksize dx-array dy-array
+                                   weight-array min-level max-level))))
+
+
+
+(define-c-function ("TCOD_heightmap_add_voronoi" %heightmap-add-voronoi) :void
+    ((heightmap heightmap-ptr) (num-points :int) (num-coefs :int) (coef-ptr :pointer)
+     (rng randomptr)))
+
+(defun* heightmap-add-voronoi ((heightmap heightmap-ptr) (num-points uint32)
+                               (coefs list) (rng randomptr))
+  "* Arguments:
+- HEIGHTMAP :: pointer to a heightmap object.
+- NUM-POINTS :: number of Voronoi sites to create.
+- COEFS :: list of floats to use to scale the distance to each site.
+- RNG :: pointer to a random number generator object."
+  (with-foreign-object (coef-array :float (length coefs))
+    (dotimes (i (length coefs))
+      (setf (mem-aref coef-array :float i) (nth i coefs)))
+    (%heightmap-add-voronoi heightmap num-points (length coefs)
+                            coef-array rng)))
+
+
+(define-c-function ("TCOD_heightmap_scale_fbm" heightmap-scale-fbm) :void
+    ((heightmap heightmap-ptr) (noise noise) (mulx :float) (muly :float)
+     (addx :float) (addy :float) (octaves :float) (delta :float) (scale :float)))
+
+(define-c-function ("TCOD_heightmap_get_normal" %heightmap-get-normal) :void
+    ;; n is a pointer to an array of 3 floats.
+  ((heightmap heightmap-ptr) (x :float) (y :float) (n :pointer)
+   (water-level :float)))
+
+(defun* (heightmap-get-normal -> list) ((heightmap heightmap-ptr)
+                                        (x single-float) (y single-float)
+                                        (water-level single-float))
+  "* Returns: a list of 3 floats, representing the normalised normal
+vector of the point at X, Y."
+  (with-foreign-object (n-array :float 3)
+    (%heightmap-get-normal heightmap x y n-array water-level)
+    (loop for i from 0 below 3 collecting (mem-aref n-array :float i))))
+
+
+(define-c-function ("TCOD_heightmap_islandify" heightmap-islandify) :void
+    ((heightmap heightmap-ptr) (sea-level :float) (rng randomptr)))
 
 
 ;;;; <<Field of view>> =========================================================
@@ -2623,6 +3219,10 @@ random locations."
     ((map mapptr) (x :int) (y :int))
   "Return true if position =(X, Y)= on the map is visible.")
 
+(define-c-function ("TCOD_map_set_in_fov" map-set-in-fov) :void
+    ((map mapptr) (x :int) (y :int) (fov? :boolean))
+  "Set whether the cell at X, Y in =MAP= is in field of view.")
+
 (define-c-function ("TCOD_map_is_transparent" map-is-transparent?) :boolean
     ((map mapptr) (x :int) (y :int))
   "Return true if position =(X, Y)= on the map is set to be transparent.")
@@ -2634,6 +3234,18 @@ random locations."
 (define-c-function ("TCOD_map_clear" map-clear) :void
     ((map mapptr))
   "Set all cells in =MAP= to be neither walkable nor transparent.")
+
+(define-c-function ("TCOD_map_get_width" map-get-width) :int
+    ((map mapptr))
+  "Return the width of the map object =MAP=.")
+
+(define-c-function ("TCOD_map_get_height" map-get-height) :int
+    ((map mapptr))
+  "Return the height of the map object =MAP=.")
+
+(define-c-function ("TCOD_map_get_nb_cells" map-get-nb-cells) :int
+    ((map mapptr))
+  "Return the number of cells in the map object =MAP=.")
 
 (define-c-function ("TCOD_map_delete" map-delete) :void
     ((map mapptr))
@@ -2675,6 +3287,10 @@ calculate movement costs.")
 (define-c-function ("TCOD_path_delete" path-delete) :void
     ((a*-path a*-path))
   "Delete an A* path object.")
+
+(define-c-function ("TCOD_path_reverse" path-reverse) :void
+    ((a*-path a*-path))
+  "Swap origin and destination for an A* path object.")
 
 (define-c-function ("TCOD_path_compute" path-compute) :boolean
     ((a*-path a*-path) (ox :int) (oy :int) (dx :int) (dy :int))
@@ -2752,6 +3368,10 @@ calculate movement costs.")
     ((dijkstra-path dijkstra-path))
   "Delete a Dijkstra path object.")
 
+(define-c-function ("TCOD_dijkstra_reverse" dijkstra-reverse) :void
+    ((dijkstra-path dijkstra-path))
+  "Swap origin and destination for a Dijkstra path object.")
+
 (define-c-function ("TCOD_dijkstra_compute" dijkstra-compute) :void
     ((dijkstra-path dijkstra-path) (rootx :int) (rooty :int))
   "Compute paths leading to the point at =(ROOTX, ROOTY)=, using the
@@ -2800,6 +3420,97 @@ the coordinates of the new location."
           (cons (mem-aref x :int) (mem-aref y :int))
           nil))))
 
+
+;;;; <<Bresenham line drawing>> ===============================================
+
+
+(define-c-function ("TCOD_line_init" line-init) :void
+    ((xfrom :int) (yfrom :int) (xto :int) (yto :int)))
+
+(define-c-function ("TCOD_line_step" line-step) :boolean
+    ((xcur :pointer) (ycur :pointer)))
+
+(define-c-function ("TCOD_line" line-line) :boolean
+    ((xfrom :int) (yfrom :int) (xto :int) (yto :int) (callback :pointer)))
+
+;; Example of how to define a lisp function which can be called from C
+;; for use as the callback function for `line-line'.
+(defcallback my-bresenham-callback :boolean
+    ((x :int) (y :int))
+  ;; In the function body: all args will have been converted to lisp.
+  ;; The function's return value will be converted to C.
+  (declare (ignore x y))
+  )
+
+
+;;;; <<BSP trees>> ============================================================
+
+
+(define-c-function ("TCOD_bsp_new_with_size" bsp-new-with-size) bsp-ptr
+    ((x :int) (y :int) (w :int) (h :int)))
+
+(define-c-function ("TCOD_bsp_remove_sons" bsp-remove-sons) :void
+    ((node bsp-ptr)))
+
+(define-c-function ("TCOD_bsp_delete" bsp-delete) :void
+    ((node bsp-ptr)))
+
+(define-c-function ("TCOD_bsp_split_once" bsp-split-once) :void
+    ((node bsp-ptr) (horizontal? :boolean) (pos :int)))
+
+(define-c-function ("TCOD_bsp_split_recursive" bsp-split-recursive) :void
+    ((node bsp-ptr) (randomiser randomptr) (nb :int) (min-h-size :int)
+     (min-v-size :int) (max-h-ratio :float) (max-v-ratio :float)))
+
+(define-c-function ("TCOD_bsp_resize" bsp-resize) :void
+    ((node bsp-ptr) (x :int) (y :int) (w :int) (h :int)))
+
+(define-c-function ("TCOD_bsp_left" bsp-left) bsp-ptr
+    ((node bsp-ptr)))
+
+(define-c-function ("TCOD_bsp_right" bsp-right) bsp-ptr
+    ((node bsp-ptr)))
+
+(define-c-function ("TCOD_bsp_father" bsp-father) bsp-ptr
+    ((node bsp-ptr)))
+
+(define-c-function ("TCOD_bsp_is_leaf" bsp-is-leaf?) :boolean
+    ((node bsp-ptr)))
+
+(define-c-function ("TCOD_bsp_contains" bsp-contains?) :boolean
+    ((node bsp-ptr) (cx :int) (cy :int)))
+
+(define-c-function ("TCOD_bsp_find_node" bsp-find-node) bsp-ptr
+    ((node bsp-ptr) (cx :int) (cy :int)))
+
+(define-c-function ("TCOD_bsp_traverse_pre_order"
+                    bsp-traverse-pre-order) :boolean
+    ((node bsp-ptr) (callback :pointer) (userdata :pointer)))
+
+(define-c-function ("TCOD_bsp_traverse_in_order"
+                    bsp-traverse-in-order) :boolean
+    ((node bsp-ptr) (callback :pointer) (userdata :pointer)))
+
+(define-c-function ("TCOD_bsp_traverse_post_order"
+                    bsp-traverse-post-order) :boolean
+    ((node bsp-ptr) (callback :pointer) (userdata :pointer)))
+
+(define-c-function ("TCOD_bsp_traverse_level_order"
+                    bsp-traverse-level-order) :boolean
+    ((node bsp-ptr) (callback :pointer) (userdata :pointer)))
+
+(define-c-function ("TCOD_bsp_traverse_inverted_level_order"
+                    bsp-traverse-inverted-level-order) :boolean
+    ((node bsp-ptr) (callback :pointer) (userdata :pointer)))
+
+;; Example of how to define a lisp function which can be called from C
+;; for use as the callback function for `bsp-traverse-X-order'.
+(defcallback my-bsp-callback :boolean
+    ((node bsp-ptr) (userdata :pointer))
+  ;; In the function body: all args will have been converted to lisp.
+  ;; The function's return value will be converted to C.
+  (declare (ignore node userdata))
+  )
 
 
 ;;;; <<Testing>> ==============================================================
