@@ -180,6 +180,8 @@
    #:mouse-lbutton-pressed
    #:mouse-mbutton-pressed
    #:mouse-rbutton-pressed
+   #:mouse-wheel-up
+   #:mouse-wheel-down
    #:mouse-move
    #:mouse-get-status
    #:mouse-is-cursor-visible?
@@ -2393,16 +2395,16 @@ value (#xRRGGBB)."
 (defun zip-put (zip val)
   (typecase val
     (string (zip-put-string zip val))
-    (character (zip-put-char zip val))
+    (character (zip-put-char zip (char-code val)))
     (integer (zip-put-int zip val))
     (float (zip-put-float zip val))
     (otherwise (error "ZIP-PUT: don't know how to translate value ~S" val))))
 
 (defun* zip-put-colour (zip (colour colournum))
   (multiple-value-bind (r g b) (decompose-colour colour)
-    (zip-put-char zip (code-char r))
-    (zip-put-char zip (code-char g))
-    (zip-put-char zip (code-char b))))
+    (zip-put-char zip r)
+    (zip-put-char zip g)
+    (zip-put-char zip b)))
 
 (declaim (inline zip-put-color))
 (defun zip-put-color (zip color)
@@ -2447,9 +2449,9 @@ value (#xRRGGBB)."
 
 
 (defun* zip-get-colour ((zip zipptr))
-  (let ((r (char-code (zip-get-char zip)))
-        (g (char-code (zip-get-char zip)))
-        (b (char-code (zip-get-char zip))))
+  (let ((r (zip-get-char zip))
+        (g (zip-get-char zip))
+        (b (zip-get-char zip)))
     (compose-colour r g b)))
 
 (declaim (inline zip-get-color))
