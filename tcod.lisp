@@ -2013,12 +2013,13 @@ value (#xRRGGBB)."
 (defun* console-print-frame ((con console) (x ucoord) (y ucoord)
                              (width ucoord) (height ucoord)
                              (empty? boolean) (flag background-flag)
-                             (fmt string) &rest args)
+                             (fmt (or string null)) &rest args)
   (assert (legal-console-coordinates? con x y))
   (check-type width ucoord)
   (check-type height ucoord)
   (%console-print-frame con x y width height empty? flag
-                        (apply #'format nil fmt args)))
+                        (if fmt (apply #'format nil fmt args)
+                            +NULL+)))
 
 
 ;; Added in wrappers.c
@@ -2030,12 +2031,13 @@ value (#xRRGGBB)."
 (defun* console-print-double-frame ((con console) (x ucoord) (y ucoord)
                                     (width ucoord) (height ucoord)
                                     (empty? boolean) (flag background-flag)
-                                    (fmt string) &rest args)
+                                    (fmt (or string null)) &rest args)
   (assert (legal-console-coordinates? con x y))
   (check-type width ucoord)
   (check-type height ucoord)
   (%console-print-double-frame con x y width height empty? flag
-                               (apply #'format nil fmt args)))
+                               (if fmt (apply #'format nil fmt args)
+                                   +NULL+)))
 
 
 
@@ -3234,7 +3236,7 @@ vector of the point at X, Y."
   "Return true if position =(X, Y)= on the map is set to be walkable.")
 
 (define-c-function ("TCOD_map_clear" map-clear) :void
-    ((map mapptr))
+    ((map mapptr) (transparent? :boolean) (walkable? :boolean))
   "Set all cells in =MAP= to be neither walkable nor transparent.")
 
 (define-c-function ("TCOD_map_get_width" map-get-width) :int
