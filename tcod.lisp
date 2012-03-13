@@ -2,6 +2,20 @@
 
 (in-package :cl-user)
 
+;;;; The documentation for this package is generated using the CLOD library.
+;;;;
+;;;; The following command is used: (tcod and clod systems must be
+;;;; loaded into the running lisp image first)
+;;;;
+
+#+nil
+(clod:document-package :tcod "tcod.org"
+                       :title "CL-TCOD"
+                       :internal-symbols? nil
+                       :brief-methods t
+                       :author "Paul Sexton"
+                       :email "eeeickythump@gmail.com")
+
 
 ;;;
 ;;; Windows users: change the string "libtcod-mingw.dll" to reflect the name
@@ -161,12 +175,14 @@
    #:make-simple-key
    #:same-keys?
    #:key-state
+   #:key-press
    #:key-pressed
    #:is-key-pressed?
    #:console-set-keyboard-repeat
    #:console-disable-keyboard-repeat
    ;; [[Mouse]] ===============================================================
    #:mouse
+   #:mouse-state
    #:make-mouse
    #:mouse-x
    #:mouse-y
@@ -401,9 +417,14 @@
    #:sys-register-sdl-renderer ;;
    #:sys-get-char-size
    #:sys-update-char ;;
+   #:sys-check-for-event
+   #:sys-wait-for-event
+   #:sys-get-events
    #:sys-clipboard-set ;;
    #:sys-clipboard-get ;;
    #:sys-flush
+   ;; [[SDL]] =================================================================
+   #:sdl-get-mouse-status
    ;; [[Testing]] =============================================================
    )
   (:documentation
@@ -453,19 +474,19 @@ libtcod newer than 1.4.1rc2, which is the first version that includes the
 with libtcod.
 
 1. Ensure you have a working common lisp installation.
-2. Ensure either [[http://www.quicklisp.org/][Quicklisp]] or the ASDF lisp
-   library is installed.
+2. Ensure either [[http://www.quicklisp.org/][Quicklisp]] (recommended) or the
+   ASDF lisp library is installed.
 3. If CFFI or DEFSTAR are not installed, download and install them somewhere
    ASDF can find them. CFFI requires several third-party lisp libraries -- see
    the CFFI documentation for more details.  Note that if you have
    Quicklisp installed, you can install CFFI and its dependencies
    easily using the command =(ql:quickload \"cffi\")= at the Lisp prompt.
 4. Put the CL-TCOD files in a directory where ASDF can find them.
-5. Make sure libtcod is installed and compiled. Make sure the libtcod
-   dynamically linked library (=.DLL= or =.SO= file) is somewhere your lisp system
-   can find it. It probably is, but if CFFI complains about being unable to
-   find the library, you can either copy it to an appropriate directory or add
-   its directory to the list variable =cffi:*foreign-library-directories*=
+5. Make sure libtcod is installed and compiled. Make sure the libtcod and libSDL
+   dynamically linked libraries (=.DLL= or =.SO= files) are somewhere your lisp
+   system can find them. They probably are, but if CFFI complains about being unable
+   to find the libraries, you can either copy them to an appropriate directory or
+   add their directory to the list variable =cffi:*foreign-library-directories*=
    e.g. by typing the following in the lisp interpreter:
 
 ;;;   (push #P\"/my/libtcod/directory/\" cffi:*foreign-library-directories*)
@@ -478,7 +499,7 @@ with libtcod.
    Use your package installer to install =libSDL=.
    Try running the libtcod demo programs to check everything works.
 
-6. Start lisp, then load CL-TCOD. Using Quicklisp:
+6. Start lisp, then load CL-TCOD. Using Quicklisp (recommended):
 
 ;;;   (ql:quickload :tcod)
 
@@ -487,12 +508,12 @@ with libtcod.
 ;;;   (load \"/path/to/asdf/asdf.lisp\")
 ;;;   (asdf:oos 'asdf:load-op :tcod)
 
-7. Type something like the following commands at the lisp prompt to start using TCOD
-   from within Lisp. Alternatively you can type =(tcod:hello-world)=, which
+7. Type something like the following commands at the lisp prompt to start using
+   TCOD from within Lisp. Alternatively you can type =(tcod:hello-world)=, which
    is a function containing the code below.
 
 ;;;   (tcod:console-set-custom-font \"terminal.png\" '(:font-layout-ascii-in-row) 16 16)
-;;;   (tcod:console-init-root 80 25 \"Test\" nil)
+;;;   (tcod:console-init-root 80 25 \"Test\" nil :renderer-sdl)
 ;;;   (tcod:console-clear tcod:*root*)
 ;;;   (tcod:console-print tcod:*root* 1 1 \"Hello, world!~%\")
 ;;;   (tcod:console-wait-for-keypress t)
@@ -717,16 +738,17 @@ it is currently a very close call between these two:
   dialect of lisp from Common Lisp.
 
 Other worthwhile free implementations:
-- [[http://clisp.cons.org][GNU CLISP]] Bytecode compiler, but runs pretty much
-  everywhere, easy to install on Windows.
+- [[http://clisp.cons.org][GNU CLISP]] Bytecode compiler, so programs won't run
+  as fast as in the compiled lisps discussed above. However it runs pretty much
+  everywhere, and is easy to install on Windows.
 - [[http://ecls.sourceforge.net/][Embeddable Common Lisp]] Promising, compiles
   to C and then passes code to your C compiler. Does this 'on the fly' when
   running as an interpreter. Also designed to be easily embeddable in non-Lisp
   applications as a scripting language.
 - [[http://common-lisp.net/project/armedbear/][Armed Bear Common Lisp]]
   Common Lisp compiler running inside the Java virtual machine, so your
-  code will run on any platform and can use all the Java libraries. I'm not
-  sure you'll be able to use libtcod with this though.
+  code will run on any platform and can use all the Java libraries. I doubt
+  you'll be able to use libtcod with this though.
 
 Help & advice with lisp:
 
@@ -765,7 +787,7 @@ Help & advice with lisp:
         #-tcod-debug nil))
 
 
-;;;; <<Library>> ==============================================================
+;;;; <<Libraries>> ============================================================
 
 
 
@@ -786,6 +808,31 @@ an already-loaded foreign library.")
 	(unless *libtcod-loaded*
 		(use-foreign-library libtcod)
 		(setf *libtcod-loaded* t)))
+
+;;; We need direct access to SDL because libtcod 1.5.1rc1 does not report
+;;; mouse buttons correctly (or at least, reading them via CFFI gives
+;;; strange, random results.)
+
+(define-foreign-library libsdl
+  (:unix "libSDL.so")
+  (:windows "SDL.dll")
+  ;; (:macintosh "NAME-OF-SDL-LIBRARY-IN-MACOS")
+  (t (:default "libsdl")))
+
+(defvar *libsdl-loaded* nil)
+
+(eval-when (:load-toplevel :execute)
+  (unless *libsdl-loaded*
+    (use-foreign-library libsdl)
+    (setf *libsdl-loaded* t)))
+
+;; Returns an 8-bit integer.
+;; bit 1: lbutton
+;; bit 2: mbutton
+;; bit 3: rbutton
+;; The arguments xptr and yptr can be null pointers.
+(defcfun ("SDL_GetMouseState" sdl-get-mouse-state) :int
+  (xptr :pointer) (yptr :pointer))
 
 
 ;;;; <<Macros>> ===============================================================
@@ -880,9 +927,11 @@ is satisfied by a list containing only bitfield keywords as members."
             ,(if body
                  `(macrolet ((call-it (&rest callargs)
                                (cons ',(prepend-percent fn-name)
-                                     (or callargs '(,@(mapcar #'car args-no-rest))))))
+                                     (or callargs '(,@(mapcar #'car
+                                                       args-no-rest))))))
                     ,@body)
-                 `(,(prepend-percent fn-name) ,@(mapcar #'car args-no-rest)))))))))
+                 `(,(prepend-percent fn-name) ,@(mapcar #'car
+                                                        args-no-rest)))))))))
 
 
 
@@ -1026,6 +1075,16 @@ to the structure used by libtcod."
   (shift nil :type boolean))
 
 
+(define-c-enum event
+    (:EVENT-NONE 0)
+    (:EVENT-KEY-PRESS 1)
+  (:EVENT-KEY-RELEASE 2)
+  (:EVENT-KEY 3)                        ; PRESS | RELEASE
+  (:EVENT-MOUSE-MOVE 4)
+  (:EVENT-MOUSE-PRESS 8)
+  (:EVENT-MOUSE-RELEASE 16)
+  (:EVENT-MOUSE 28)                     ; MOVE | PRESS | RELEASE
+  (:EVENT-ANY 31))
 
 
 (define-c-enum drawing-character
@@ -1545,7 +1604,8 @@ value (#xRRGGBB)."
     (colour-hsv hue sat val)))
 
 
-(defun* (colour-set-saturation -> colournum) ((colour colournum) (sat single-float))
+(defun* (colour-set-saturation -> colournum) ((colour colournum)
+                                              (sat single-float))
   "Return COLOUR with its saturation modified to SAT."
   (let ((hue (colour-get-hue colour))
         (val (colour-get-value colour)))
@@ -1559,7 +1619,8 @@ value (#xRRGGBB)."
     (colour-hsv hue sat val)))
 
 
-(defun* (colour-shift-hue -> colournum) ((colour colournum) (hshift single-float))
+(defun* (colour-shift-hue -> colournum) ((colour colournum)
+                                         (hshift single-float))
   (if (zerop hshift)
       colour
       (destructuring-bind (h s v) (colour-get-hsv colour)
@@ -1627,7 +1688,8 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_console_credits_reset" console-credits-reset) :void
     ())
 
-(define-c-function ("TCOD_console_credits_render" console-credits-render) :boolean
+(define-c-function ("TCOD_console_credits_render" console-credits-render)
+    :boolean
   ((x :int) (y :int) (alpha :boolean)))
 
 
@@ -1647,7 +1709,8 @@ value (#xRRGGBB)."
 ;;                        int char_width, int char_height, int nb_char_horiz,
 ;;                        int nb_char_vertic, bool chars_by_row,
 ;;                        TCOD_color_t key_color);
-(define-c-function ("TCOD_console_set_custom_font" console-set-custom-font) :void
+(define-c-function ("TCOD_console_set_custom_font" console-set-custom-font)
+    :void
     ((fontfile :string) (flags custom-font-flags)
      (chars-horizontal :int) (chars-vertical :int))
   (assert (probe-file fontfile))
@@ -1676,15 +1739,18 @@ value (#xRRGGBB)."
 
 
 ;;TCODLIB_API void TCOD_console_set_window_title(const char *title);
-(define-c-function ("TCOD_console_set_window_title" console-set-window-title) :void
+(define-c-function ("TCOD_console_set_window_title" console-set-window-title)
+    :void
   ((title :string)))
 
 ;;TCODLIB_API void TCOD_console_set_fullscreen(bool fullscreen);
-(define-c-function ("TCOD_console_set_fullscreen" console-set-fullscreen) :void
+(define-c-function ("TCOD_console_set_fullscreen" console-set-fullscreen)
+    :void
   ((full? :boolean)))
 
 ;;TCODLIB_API bool TCOD_console_is_fullscreen();
-(define-c-function ("TCOD_console_is_fullscreen" console-is-fullscreen?) :boolean
+(define-c-function ("TCOD_console_is_fullscreen" console-is-fullscreen?)
+    :boolean
     ())
 
 ;;TCODLIB_API bool TCOD_console_is_window_closed();
@@ -1809,7 +1875,8 @@ value (#xRRGGBB)."
   (call-it))
 
 
-(define-c-function ("TCOD_console_put_char_ex_wrapper" console-put-char-ex) :void
+(define-c-function ("TCOD_console_put_char_ex_wrapper" console-put-char-ex)
+    :void
     ((con console) (x :int) (y :int) (ch :unsigned-char) (fg colournum)
      (bg colournum))
   (assert (legal-console-coordinates? con x y))
@@ -2144,7 +2211,9 @@ value (#xRRGGBB)."
     ;; not true when it is called. We therefore check the assertion here first,
     ;; so we have access to lisp debugging facilities if the conditions are not
     ;; met.
-    (assert (and (plusp wsrc) (plusp hsrc)
+    ;; In libtcod 1.5.1, the whole console is blitted if wsrc and hsrc are 0
+    (assert (and (or (and (zerop wsrc) (zerop hsrc))
+                     (and (plusp wsrc) (plusp hsrc)))
                  (>= (+ xdest wsrc) 0) (>= (+ ydest hsrc) 0)))
     (call-it src xsrc ysrc wsrc hsrc dest xdest ydest
              foreground-alpha background-alpha)))
@@ -2157,7 +2226,8 @@ value (#xRRGGBB)."
 
 
 #+nil
-(define-c-function ("TCOD_console_set_key_color_wrapper" console-set-key-colour) :void
+(define-c-function ("TCOD_console_set_key_color_wrapper" console-set-key-colour)
+    :void
     ((con console) (colour colournum)))
 
 
@@ -2227,13 +2297,15 @@ value (#xRRGGBB)."
 
 
 (defun* console-print-rect-ex-utf ((con console) (x ucoord) (y ucoord)
-                                   (w ucoord) (h ucoord)
-                                   (flag background-flag) (align alignment)
-                                   (fmt string) &rest args)
+                                                 (w ucoord) (h ucoord)
+                                                 (flag background-flag)
+                                                 (align alignment)
+                                                 (fmt string) &rest args)
   (let ((str (apply #'format nil fmt args)))
     (with-foreign-pointer-as-string (strbuf (length str))
       (%console-print-rect-ex-utf con x y w h flag align
-                                  (lisp-string-to-foreign str strbuf (length str)
+                                  (lisp-string-to-foreign str strbuf
+                                                          (length str)
                                                           :encoding :utf-16)))))
 
 
@@ -2243,29 +2315,31 @@ value (#xRRGGBB)."
 
 
 (defun* console-get-height-rect-utf ((con console) (x ucoord) (y ucoord)
-                                     (w ucoord) (h ucoord)
-                                     (fmt string) &rest args)
+                                                   (w ucoord) (h ucoord)
+                                                   (fmt string) &rest args)
   (let ((str (apply #'format nil fmt args)))
     (with-foreign-pointer-as-string (strbuf (length str))
       (%console-get-height-rect-utf con x y w h
-                                    (lisp-string-to-foreign str strbuf (length str)
-                                                            :encoding :utf-16)))))
+                                    (lisp-string-to-foreign
+                                     str strbuf
+                                     (length str)
+                                     :encoding :utf-16)))))
 
 
 
 ;;;; <<Keyboard input>> ========================================================
 
 
-;; (defun key->keypress (keyptr)
-;;   (let ((flags (foreign-slot-value keyptr 'key-press 'flags)))
-;;     (make-key :vk (foreign-slot-value keyptr 'key-press 'vk)
-;;            :c (code-char (foreign-slot-value keyptr 'key-press 'c))
-;;            :pressed (get-bit flags 1)
-;;            :lalt (get-bit flags 2)
-;;            :lctrl (get-bit flags 3)
-;;            :ralt (get-bit flags 4)
-;;            :rctrl (get-bit flags 5)
-;;            :shift (get-bit flags 6))))
+(defun key->keypress (keyptr)
+  (let ((flags (foreign-slot-value keyptr 'key-press 'flags)))
+    (make-key :vk (foreign-slot-value keyptr 'key-press 'vk)
+           :c (code-char (foreign-slot-value keyptr 'key-press 'c))
+           :pressed (get-bit flags 1)
+           :lalt (get-bit flags 2)
+           :lctrl (get-bit flags 3)
+           :ralt (get-bit flags 4)
+           :rctrl (get-bit flags 5)
+           :shift (get-bit flags 6))))
 
 (defmacro and& (a b)
   "Shorthand for (BOOLE 'BOOLE-AND A B)."
@@ -2277,57 +2351,53 @@ value (#xRRGGBB)."
                         (and& (ash key-bf -16) #x00FF)))
 
 
-(defun* key->keypress ((key-bf (unsigned-byte 32)))
-  (let ((flags (ash key-bf -24)))
-    (make-key :vk (key-bitfield->vk key-bf) ;;(ldb (byte 8 16) key-bf)
-              :c (code-char (and& key-bf #x0000FFFF))  ;;(ldb (byte 16 0) key-bf)
-              :pressed (get-bit flags 1)
-              :lalt (get-bit flags 2)
-              :lctrl (get-bit flags 3)
-              :ralt (get-bit flags 4)
-              :rctrl (get-bit flags 5)
-              :shift (get-bit flags 6))))
+;; (defun* key->keypress ((key-bf (unsigned-byte 32)))
+;;   (let ((flags (ash key-bf -24)))
+;;     (make-key :vk (key-bitfield->vk key-bf) ;;(ldb (byte 8 16) key-bf)
+;;               :c (code-char (and& key-bf #x0000FFFF))  ;;(ldb (byte 16 0) key-bf)
+;;               :pressed (get-bit flags 1)
+;;               :lalt (get-bit flags 2)
+;;               :lctrl (get-bit flags 3)
+;;               :ralt (get-bit flags 4)
+;;               :rctrl (get-bit flags 5)
+;;               :shift (get-bit flags 6))))
 
 
 ;;TCODLIB_API TCOD_key_t TCOD_console_check_for_keypress(int flags);
-(defcfun ("TCOD_console_check_for_keypress_bitfield"
-          %console-check-for-keypress) :int
-    (flags key-state))
+(defcfun ("TCOD_console_check_for_keypress_wrapper"
+          %console-check-for-keypress) :boolean
+    (keyptr :pointer) (flags key-state))
 
 
-(defun* (console-check-for-keypress -> (or null key)) ((flags key-state))
-  (let ((key-bf (%console-check-for-keypress flags)))
-    (if (eql (key-bitfield->vk key-bf) :none)
-        nil
-        (key->keypress key-bf))))
+;; (defun* (console-check-for-keypress -> (or null key)) ((flags key-state))
+;;   (let* ((keyptr pointer)
+;;          (pressed? (%console-check-for-keypress keyptr flags)))
+;;     (if pressed?
+;;         (key->keypress keyptr)          ;!!
+;;         nil)))
 
 
-;; (defun* console-check-for-keypress ((flags key-state))
-;;   ;; (unless *key*
-;;   ;;   (setf *key* (foreign-alloc 'key-press)))
-;;   (with-foreign-object (key 'key-press)
-;;     (%console-check-for-keypress key flags)
-;;     (unless (eql :none (foreign-slot-value key 'key-press 'vk))
-;;       (key->keypress key))))
+(defun* console-check-for-keypress ((flags key-state))
+  (with-foreign-object (keyptr 'key-press)
+    (if (%console-check-for-keypress keyptr flags)
+        (key->keypress keyptr))))
 
 
 ;;TCODLIB_API TCOD_key_t TCOD_console_wait_for_keypress(bool flush);
-(defcfun ("TCOD_console_wait_for_keypress_bitfield"
-          %console-wait-for-keypress) :int
-  (flush? :boolean))
-
-
-(defun* console-wait-for-keypress ((flush? boolean))
-  (key->keypress (%console-wait-for-keypress flush?)))
-
+(defcfun ("TCOD_console_wait_for_keypress_wrapper"
+          %console-wait-for-keypress) :void
+  (keyptr :pointer) (flush? :boolean))
 
 
 ;; (defun* console-wait-for-keypress ((flush? boolean))
-;;   ;; (unless *key*
-;;   ;;   (setf *key* (foreign-alloc 'key-press)))
-;;   (with-foreign-object (key 'key-press)
-;;     (%console-wait-for-keypress key flush?)
-;;     (key->keypress key)))
+;;   (key->keypress (%console-wait-for-keypress flush?)))
+
+
+
+(defun* console-wait-for-keypress ((flush? boolean))
+  (with-foreign-object (keyptr 'key-press)
+    (%console-wait-for-keypress keyptr flush?)
+    (key->keypress keyptr)))
 
 
 ;;TCODLIB_API void TCOD_console_set_keyboard_repeat(int initial_delay,
@@ -2357,7 +2427,8 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_namegen_generate" namegen-generate) :string
     ((name :string) (allocate? :boolean)))
 
-(define-c-function ("TCOD_namegen_generate_custom" namegen-generate-custom) :string
+(define-c-function ("TCOD_namegen_generate_custom" namegen-generate-custom)
+    :string
     ((name :string) (rule :string) (allocate? :boolean)))
 
 (define-c-function ("TCOD_namegen_destroy" namegen-destroy) :void
@@ -2463,6 +2534,42 @@ value (#xRRGGBB)."
 
 ;;;; <<System>> ===============================================================
 
+;;TCODLIB_API TCOD_event_t TCOD_sys_wait_for_event(int eventMask,
+;;  TCOD_key_t *key, TCOD_mouse_t *mouse, bool flush);
+(define-c-function ("TCOD_sys_wait_for_event" sys-wait-for-event) event
+  ((eventmask event) (key :pointer) (mouseptr :pointer) (flush? :boolean)))
+
+;;TCODLIB_API TCOD_event_t TCOD_sys_check_for_event(int eventMask,
+;;  TCOD_key_t *key, TCOD_mouse_t *mouse);
+(define-c-function ("TCOD_sys_check_for_event" sys-check-for-event) event
+  ((eventmask event) (key :pointer) (mouseptr :pointer)))
+
+
+(defun sys-get-events ()
+  "User-friendly wrapper for the new input event model in libtcod 1.5.1rc1.
+When called, returns a list of all queued events (calling the function
+also EMPTIES the queue). Each element in the list is a cons cell of the
+form (EVENT-TYPE . DATA) where EVENT-TYPE is a member of the `event' enum,
+and DATA is either a key struct or a mouse-state struct."
+  (cffi:with-foreign-objects ((keyptr 'key-press)
+                              (mouseptr 'mouse-state))
+    (loop
+      for event = (sys-check-for-event :event-any keyptr mouseptr)
+      when (member event '(:event-key-release :event-key-press))
+        collect (cons event (key->keypress keyptr))
+      when (member event '(:event-mouse-release :event-mouse-press
+                           :event-mouse-move))
+        collect (let ((mouse (parse-mouse-state mouseptr))
+                      (bits (sdl-get-mouse-state +null+ +null+)))
+                  (setf (mouse-lbutton mouse) (plusp (boole boole-and bits 1)))
+                  (setf (mouse-mbutton mouse) (plusp (boole boole-and bits 2)))
+                  (setf (mouse-rbutton mouse) (plusp (boole boole-and bits 4)))
+                  (setf (mouse-lbutton-pressed mouse) nil
+                        (mouse-mbutton-pressed mouse) nil
+                        (mouse-rbutton-pressed mouse) nil)
+                  (cons event mouse))
+      until (eql event :event-none))))
+
 
 (define-c-function ("TCOD_sys_create_directory" sys-create-directory) :boolean
     ((path :string)))
@@ -2501,8 +2608,10 @@ value (#xRRGGBB)."
 
 ;; Lisp wrapper needed because actual function returns nothing, whereas we
 ;; want to return resolution.
-(defcfun ("TCOD_sys_get_current_resolution_x" sys-get-current-resolution-x) :int)
-(defcfun ("TCOD_sys_get_current_resolution_y" sys-get-current-resolution-y) :int)
+(defcfun ("TCOD_sys_get_current_resolution_x" sys-get-current-resolution-x)
+    :int)
+(defcfun ("TCOD_sys_get_current_resolution_y" sys-get-current-resolution-y)
+    :int)
 
 (defun sys-get-current-resolution ()
   (values (sys-get-current-resolution-x)
@@ -2575,7 +2684,8 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_random_restore" random-restore) :void
   ((rng randomptr) (backup randomptr)))
 
-(define-c-function ("TCOD_random_set_distribution" random-set-distribution) :void
+(define-c-function ("TCOD_random_set_distribution" random-set-distribution)
+    :void
   ((rng randomptr) (dist rng-distribution)))
 
 (define-c-function ("TCOD_random_get_int" random-get-int) :int
@@ -2593,7 +2703,8 @@ value (#xRRGGBB)."
 (define-c-function ("TCOD_random_get_float_mean" random-get-float-mean) :float
   ((rng randomptr) (min :float) (max :float) (mean :float)))
 
-(define-c-function ("TCOD_random_get_double_mean" random-get-double-mean) :double
+(define-c-function ("TCOD_random_get_double_mean" random-get-double-mean)
+    :double
   ((rng randomptr) (min :double) (max :double) (mean :double)))
 
 
@@ -2601,53 +2712,60 @@ value (#xRRGGBB)."
 ;;;; <<Mouse>> ================================================================
 
 
-;; This may not work, because each time any one of these functions is called,
-;; a mouse state is fetched. Events such as release of a mouse button might
-;; only appear in a single mouse state.
-(defcfun ("TCOD_mouse_get_x" mouse-get-x) :int)
-(defcfun ("TCOD_mouse_get_y" mouse-get-y) :int)
-(defcfun ("TCOD_mouse_get_cx" mouse-get-cx) :int)
-(defcfun ("TCOD_mouse_get_cy" mouse-get-cy) :int)
-(defcfun ("TCOD_mouse_get_dx" mouse-get-dx) :int)
-(defcfun ("TCOD_mouse_get_dy" mouse-get-dy) :int)
-(defcfun ("TCOD_mouse_get_dcx" mouse-get-dcx) :int)
-(defcfun ("TCOD_mouse_get_dcy" mouse-get-dcy) :int)
-(defcfun ("TCOD_mouse_get_lbutton" mouse-get-lbutton) :unsigned-int)
-(defcfun ("TCOD_mouse_get_mbutton" mouse-get-mbutton) :unsigned-int)
-(defcfun ("TCOD_mouse_get_rbutton" mouse-get-rbutton) :unsigned-int)
-(defcfun ("TCOD_mouse_get_lbutton_pressed" mouse-get-lbutton-pressed)
-    :unsigned-int)
-(defcfun ("TCOD_mouse_get_mbutton_pressed" mouse-get-mbutton-pressed)
-    :unsigned-int)
-(defcfun ("TCOD_mouse_get_rbutton_pressed" mouse-get-rbutton-pressed)
-    :unsigned-int)
+;; (defcfun ("TCOD_mouse_get_x" mouse-get-x) :int)
+;; (defcfun ("TCOD_mouse_get_y" mouse-get-y) :int)
+;; (defcfun ("TCOD_mouse_get_cx" mouse-get-cx) :int)
+;; (defcfun ("TCOD_mouse_get_cy" mouse-get-cy) :int)
+;; (defcfun ("TCOD_mouse_get_dx" mouse-get-dx) :int)
+;; (defcfun ("TCOD_mouse_get_dy" mouse-get-dy) :int)
+;; (defcfun ("TCOD_mouse_get_dcx" mouse-get-dcx) :int)
+;; (defcfun ("TCOD_mouse_get_dcy" mouse-get-dcy) :int)
+;; (defcfun ("TCOD_mouse_get_lbutton" mouse-get-lbutton) :unsigned-int)
+;; (defcfun ("TCOD_mouse_get_mbutton" mouse-get-mbutton) :unsigned-int)
+;; (defcfun ("TCOD_mouse_get_rbutton" mouse-get-rbutton) :unsigned-int)
+;; (defcfun ("TCOD_mouse_get_lbutton_pressed" mouse-get-lbutton-pressed)
+;;     :unsigned-int)
+;; (defcfun ("TCOD_mouse_get_mbutton_pressed" mouse-get-mbutton-pressed)
+;;     :unsigned-int)
+;; (defcfun ("TCOD_mouse_get_rbutton_pressed" mouse-get-rbutton-pressed)
+;;     :unsigned-int)
 
 
-#+nil
-(defun* (mouse-state->mouse -> mouse) (ms)
-  ;;(let ((flags (foreign-slot-value ms 'mouse-state 'flags)))
-  (break)
-  (make-mouse :x (foreign-slot-value ms 'mouse-state 'x)
-              :y (foreign-slot-value ms 'mouse-state 'y)
-              :dx (foreign-slot-value ms 'mouse-state 'dx)
-              :dy (foreign-slot-value ms 'mouse-state 'dy)
-              :cx (foreign-slot-value ms 'mouse-state 'cx)
-              :cy (foreign-slot-value ms 'mouse-state 'cy)
-              :dcx (foreign-slot-value ms 'mouse-state 'dcx)
-              :dcy (foreign-slot-value ms 'mouse-state 'dcy)
-              ;; :lbutton (get-bit flags 1)
-              ;; :rbutton (get-bit flags 2)
-              ;; :mbutton (get-bit flags 3)
-              ;; :lbutton-pressed (get-bit flags 4)
-              ;; :rbutton-pressed (get-bit flags 5)
-              ;; :mbutton-pressed (get-bit flags 6))))
-              :lbutton (foreign-slot-value ms 'mouse-state 'lbutton)
-              :rbutton (foreign-slot-value ms 'mouse-state 'rbutton)
-              :mbutton (foreign-slot-value ms 'mouse-state 'mbutton)
-              :lbutton-pressed (foreign-slot-value ms 'mouse-state 'lbutton-pressed)
-              :rbutton-pressed (foreign-slot-value ms 'mouse-state 'rbutton-pressed)
-              :mbutton-pressed (foreign-slot-value ms 'mouse-state 'mbutton-pressed)))
 
+(defun* (mouse-get-status -> mouse) (&optional (update? nil))
+  "Note that as of libtcod 1.5.1rc1, `mouse-get-status' returns
+information about the status of the mouse as at the last time
+`sys-check-for-event' was called. If you want the *current* status
+of the mouse to be returned instead, UPDATE? should be non-nil."
+  (with-foreign-object (ms 'mouse-state)
+    (cond
+      (update?
+       ;; sys-check-for-event only checks and removes ONE event.
+       (sys-check-for-event :event-any +null+ ms))
+      (t
+       (%mouse-get-status ms)))
+    (parse-mouse-state ms)))
+
+
+(defun parse-mouse-state (mouseptr)
+  (make-mouse :x (foreign-slot-value mouseptr 'mouse-state 'x)
+              :y (foreign-slot-value mouseptr 'mouse-state 'y)
+              :dx (foreign-slot-value mouseptr 'mouse-state 'dx)
+              :dy (foreign-slot-value mouseptr 'mouse-state 'dy)
+              :cx (foreign-slot-value mouseptr 'mouse-state 'cx)
+              :cy (foreign-slot-value mouseptr 'mouse-state 'cy)
+              :dcx (foreign-slot-value mouseptr 'mouse-state 'dcx)
+              :dcy (foreign-slot-value mouseptr 'mouse-state 'dcy)
+              :lbutton (foreign-slot-value mouseptr 'mouse-state 'lbutton)
+              :rbutton (foreign-slot-value mouseptr 'mouse-state 'rbutton)
+              :mbutton (foreign-slot-value mouseptr 'mouse-state 'mbutton)
+              :lbutton-pressed (foreign-slot-value mouseptr 'mouse-state
+                                                   'lbutton-pressed)
+              :rbutton-pressed (foreign-slot-value mouseptr 'mouse-state
+                                                   'rbutton-pressed)
+              :mbutton-pressed (foreign-slot-value mouseptr 'mouse-state
+                                                   'mbutton-pressed)
+              ))
 
 
 ;;TCODLIB_API TCOD_mouse_t TCOD_mouse_get_status();
@@ -2655,30 +2773,30 @@ value (#xRRGGBB)."
   (mouseptr :pointer))
 
 ;; Old version - creates a foreign struct.
-#+nil
-(defun* (mouse-get-status -> mouse) ()
-  (with-foreign-object (rodent 'mouse-state)
-    (%mouse-get-status rodent)
-    (mouse-state->mouse rodent)))
+
+;; (defun* (mouse-get-status -> mouse) ()
+;;   (with-foreign-object (rodent 'mouse-state)
+;;     (%mouse-get-status rodent)
+;;     (mouse-state->mouse rodent)))
 
 
 ;; New version - gets all data from foreign functions.
-(defun mouse-get-status ()
-  (%mouse-get-status (null-pointer))
-  (make-mouse :x (mouse-get-x)
-              :y (mouse-get-y)
-              :dx (mouse-get-dx)
-              :dy (mouse-get-dy)
-              :cx (mouse-get-cx)
-              :cy (mouse-get-cy)
-              :dcx (mouse-get-dcx)
-              :dcy (mouse-get-dcy)
-              :lbutton (plusp (mouse-get-lbutton))
-              :rbutton (plusp (mouse-get-rbutton))
-              :mbutton (plusp (mouse-get-mbutton))
-              :lbutton-pressed (plusp (mouse-get-lbutton-pressed))
-              :rbutton-pressed (plusp (mouse-get-rbutton-pressed))
-              :mbutton-pressed (plusp (mouse-get-mbutton-pressed))))
+;; (defun mouse-get-status ()
+;;   (%mouse-get-status (null-pointer))
+;;   (make-mouse :x (mouse-get-x)
+;;               :y (mouse-get-y)
+;;               :dx (mouse-get-dx)
+;;               :dy (mouse-get-dy)
+;;               :cx (mouse-get-cx)
+;;               :cy (mouse-get-cy)
+;;               :dcx (mouse-get-dcx)
+;;               :dcy (mouse-get-dcy)
+;;               :lbutton (plusp (mouse-get-lbutton))
+;;               :rbutton (plusp (mouse-get-rbutton))
+;;               :mbutton (plusp (mouse-get-mbutton))
+;;               :lbutton-pressed (plusp (mouse-get-lbutton-pressed))
+;;               :rbutton-pressed (plusp (mouse-get-rbutton-pressed))
+;;               :mbutton-pressed (plusp (mouse-get-mbutton-pressed))))
 
 
 
@@ -3139,8 +3257,8 @@ random locations."
   "* Arguments:
 - HEIGHTMAP :: pointer to a heightmap object.
 - COORDS :: a list of (X . Y) cons cells specifying coordinates relative to the
-cell being processed. For example (-1 . 0) is the cell to the west, (0 . 1) is the
-cell to the south, etc.
+cell being processed. For example (-1 . 0) is the cell to the west, (0 . 1) is
+the cell to the south, etc.
 - WEIGHTS :: a list of factors by which to scale the values in processed cells.
 The list must be the same length as COORDS.
 - MIN-LEVEL, MAX-LEVEL :: Cells are only processed if their values lies within
@@ -3160,7 +3278,8 @@ these limits."
 
 
 (define-c-function ("TCOD_heightmap_add_voronoi" %heightmap-add-voronoi) :void
-    ((heightmap heightmap-ptr) (num-points :int) (num-coefs :int) (coef-ptr :pointer)
+    ((heightmap heightmap-ptr) (num-points :int) (num-coefs :int)
+                               (coef-ptr :pointer)
      (rng randomptr)))
 
 (defun* heightmap-add-voronoi ((heightmap heightmap-ptr) (num-points uint32)
@@ -3179,7 +3298,8 @@ these limits."
 
 (define-c-function ("TCOD_heightmap_scale_fbm" heightmap-scale-fbm) :void
     ((heightmap heightmap-ptr) (noise noise) (mulx :float) (muly :float)
-     (addx :float) (addy :float) (octaves :float) (delta :float) (scale :float)))
+     (addx :float) (addy :float) (octaves :float) (delta :float)
+                               (scale :float)))
 
 (define-c-function ("TCOD_heightmap_get_normal" %heightmap-get-normal) :void
     ;; n is a pointer to an array of 3 floats.
@@ -3209,7 +3329,8 @@ vector of the point at X, Y."
   "Return a new map object of the given dimensions.")
 
 (define-c-function ("TCOD_map_set_properties" map-set-properties) :void
-    ((map mapptr) (x :int) (y :int) (transparent? :boolean) (walkable? :boolean))
+    ((map mapptr) (x :int) (y :int) (transparent? :boolean)
+                  (walkable? :boolean))
   "Set the properties of the map cell at =(X, Y)=. It is walkable if
 =walkable?= is true, and transparent if =transparent?= is true.")
 
@@ -3282,7 +3403,8 @@ vector of the point at X, Y."
 ;;   (tcod:path-new-using-function x y (callback my-a*-callback) ptr)
 ;; Where 'my-a*-callback' is a lisp function defined using defcallback
 ;; (see above).
-(define-c-function ("TCOD_path_new_using_function" path-new-using-function) a*-path
+(define-c-function ("TCOD_path_new_using_function" path-new-using-function)
+    a*-path
     ((xdim :int) (ydim :int) (callback :pointer) (user-data :pointer)
      (diagonal-cost :float))
   "Return a new A* path object, which will call the function =CALLBACK= to
@@ -3337,10 +3459,12 @@ destination."
       (cons (mem-aref x :int) (mem-aref y :int)))))
 
 (defcfun ("TCOD_path_walk" %path-walk) :boolean
-  (a*-path a*-path) (xptr :pointer) (yptr :pointer) (recalc-when-needed? :boolean))
+  (a*-path a*-path) (xptr :pointer) (yptr :pointer)
+  (recalc-when-needed? :boolean))
 
 (defun* (path-walk -> (or null (cons fixnum fixnum))) ((a*-path a*-path)
-                                                       (recalc-when-needed? boolean))
+                                                       (recalc-when-needed?
+                                                        boolean))
   "Move one step along =PATH=. The path becomes one step shorter. Returns
 the coordinates of the new location."
   (with-foreign-object (x :int)
@@ -3361,7 +3485,8 @@ the coordinates of the new location."
     ((map mapptr) (diagonal-cost :float))
   "Return a new Dijkstra path object which uses =MAP=.")
 
-(define-c-function ("TCOD_dijkstra_new_using_function" dijkstra-new-using-function)
+(define-c-function ("TCOD_dijkstra_new_using_function"
+                    dijkstra-new-using-function)
     dijkstra-path
     ((xdim :int) (ydim :int) (callback :pointer) (user-data :pointer)
      (diagonal-cost :float))
@@ -3526,7 +3651,5 @@ the coordinates of the new location."
   (tcod:console-print tcod:*root* 40 25 "Hello World!")
   (tcod:console-flush)
   (tcod:console-wait-for-keypress t))
-
-
 
 ;;;; tcod.lisp ends here ======================================================
