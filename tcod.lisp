@@ -1,4 +1,4 @@
-;;;; -*- Mode: Lisp; Syntax: ANSI-Common-Lisp; Base: 10 -*- ;;;;;;;;;;;;;;;;;80
+;;;; -*- Mode: lisp; coding: utf-8-unix -*- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;80
 
 (in-package :cl-user)
 
@@ -790,14 +790,17 @@ Help & advice with lisp:
 ;;;; <<Libraries>> ============================================================
 
 
+#+darwin
+(dolist (path '(#p"/opt/local/lib/" #p"/usr/local/lib/"))
+  (pushnew path cffi:*foreign-library-directories*))
 
 (define-foreign-library libtcod
-	(:unix #+libtcod-debug "libtcod-debug.so"
-               #-libtcod-debug "libtcod.so")
-	(:windows #-libtcod-debug "libtcod-mingw.dll"
-                  #+libtcod-debug "libtcod-mingw-debug.dll")
-	;; (:macintosh "NAME-OF-LIBTCOD-LIBRARY-IN-MACOS")
-	(t (:default "libtcod")))
+    (:darwin "libtcod.dylib")
+  (:windows #-libtcod-debug "libtcod-mingw.dll"
+            #+libtcod-debug "libtcod-mingw-debug.dll")
+  (:unix #+libtcod-debug "libtcod-debug.so"
+         #-libtcod-debug "libtcod.so")
+  (t (:default "libtcod")))
 
 (defvar *libtcod-loaded* nil
   "Global variable, set to non-nil once libtcod is loaded. This is to
@@ -814,9 +817,9 @@ an already-loaded foreign library.")
 ;;; strange, random results.)
 
 (define-foreign-library libsdl
+  (:darwin "libSDL.dylib")
   (:unix "libSDL.so")
   (:windows "SDL.dll")
-  ;; (:macintosh "NAME-OF-SDL-LIBRARY-IN-MACOS")
   (t (:default "libsdl")))
 
 (defvar *libsdl-loaded* nil)
@@ -2341,20 +2344,16 @@ value (#xRRGGBB)."
            :rctrl (get-bit flags 5)
            :shift (get-bit flags 6))))
 
-(defmacro and& (a b)
-  "Shorthand for (BOOLE 'BOOLE-AND A B)."
-  `(boole boole-and ,a ,b))
-
 
 (defun key-bitfield->vk (key-bf)
   (foreign-enum-keyword 'keycode
-                        (and& (ash key-bf -16) #x00FF)))
+                        (logand (ash key-bf -16) #x00FF)))
 
 
 ;; (defun* key->keypress ((key-bf (unsigned-byte 32)))
 ;;   (let ((flags (ash key-bf -24)))
 ;;     (make-key :vk (key-bitfield->vk key-bf) ;;(ldb (byte 8 16) key-bf)
-;;               :c (code-char (and& key-bf #x0000FFFF))  ;;(ldb (byte 16 0) key-bf)
+;;               :c (code-char (logand key-bf #x0000FFFF))  ;;(ldb (byte 16 0) key-bf)
 ;;               :pressed (get-bit flags 1)
 ;;               :lalt (get-bit flags 2)
 ;;               :lctrl (get-bit flags 3)
