@@ -55,54 +55,54 @@ libtcod newer than 1.4.1rc2, which is the first version that includes the
 `wrappers.c` and `wrappers.h` source files that allow `cl-tcod` to interface
 with libtcod.
 
-1. Ensure you have a working common lisp installation.
-2. Ensure either [Quicklisp][] or the [ASDF][] lisp
-   library is installed.
-3. If [CFFI][] or [defstar][] are not installed, download and install them
-   somewhere ASDF can find them. CFFI requires several third-party lisp
-   libraries -- see the CFFI documentation for more details. Note that if you
-   have Quicklisp installed, you can install CFFI and its dependencies easily
-   using the command `(ql:quickload "cffi")` at the Lisp prompt.
-4. Put the `cl-tcod` files in a directory where ASDF can find them.
-5. Make sure libtcod is installed and compiled. Make sure the libtcod
-   dynamically linked library (.dll, .so or .dylib file) is somewhere your lisp
-   system can find it. It probably is, but if `CFFI` complains about being unable
-   to find the library, you can either copy it to an appropriate directory or
-   add its directory to the list variable `cffi:*foreign-library-directories*`
-   e.g. by typing the following in the lisp interpreter:
+1.  Ensure you have a working common lisp installation.
+2.  Ensure either [Quicklisp][] or the [ASDF][] lisp
+    library is installed.
+3.  If [CFFI][] or [defstar][] are not installed, download and install them
+    somewhere ASDF can find them. CFFI requires several third-party lisp
+    libraries -- see the CFFI documentation for more details. Note that if you
+    have Quicklisp installed, you can install CFFI and its dependencies easily
+    using the command `(ql:quickload "cffi")` at the Lisp prompt.
+4.  Put the `cl-tcod` files in a directory where ASDF can find them.
+5.  Make sure libtcod is installed and compiled. Make sure the libtcod
+    dynamically linked library (.dll, .so or .dylib file) is somewhere your lisp
+    system can find it. It probably is, but if `CFFI` complains about being unable
+    to find the library, you can either copy it to an appropriate directory or
+    add its directory to the list variable `cffi:*foreign-library-directories*`
+    e.g. by typing the following in the lisp interpreter:
 
-    :::cl
-    (push #P"/my/libtcod/directory/" cffi:*foreign-library-directories*)
+        :::cl
+        (push #P"/my/libtcod/directory/" cffi:*foreign-library-directories*)
 
-   On windows, .dll files should be put in one of the directories listed in the
-   `PATH` environment variable. You will need to put `SDL.dll` in the same place
-   if you don't already have SDL installed.
+    On windows, .dll files should be put in one of the directories listed in the
+    `PATH` environment variable. You will need to put `SDL.dll` in the same place
+    if you don't already have SDL installed.
 
-   On Linux, you can usually put .so files in `/usr/local/lib/`.
-   Use your package installer to install `libSDL`.
-   Try running the libtcod demo programs to check everything works.
+    On Linux, you can usually put .so files in `/usr/local/lib/`.
+    Use your package installer to install `libSDL`.
+    Try running the libtcod demo programs to check everything works.
 
-6. Start lisp, then load `cl-tcod`. Using Quicklisp:
+6.  Start lisp, then load `cl-tcod`. Using Quicklisp:
 
-    :::cl
-    (ql:quickload :tcod)
+        :::cl
+        (ql:quickload :tcod)
 
-   Using ASDF:
+    Using ASDF:
 
-    :::cl
-    (load "/path/to/asdf/asdf.lisp")
-    (asdf:oos 'asdf:load-op :tcod)
+        :::cl
+        (load "/path/to/asdf/asdf.lisp")
+        (asdf:oos 'asdf:load-op :tcod)
 
-7. Type something like the following commands at the lisp prompt to start using
-   libtcod from within Lisp. Alternatively you can type `(tcod:hello-world)`, which
-   is a function containing the code below.
+7.  Type something like the following commands at the lisp prompt to start using
+    libtcod from within Lisp. Alternatively you can type `(tcod:hello-world)`,
+    which is a function containing the code below.
 
-    :::cl
-    (tcod:console-set-custom-font "terminal.png" '(:font-layout-ascii-in-row) 16 16)
-    (tcod:console-init-root 80 25 "Test" nil :renderer-sdl)
-    (tcod:console-clear tcod:*root*)
-    (tcod:console-print tcod:*root* 1 1 "Hello, world!~%")
-    (tcod:console-wait-for-keypress t)
+        :::cl
+        (tcod:console-set-custom-font "terminal.png" '(:font-layout-ascii-in-row) 16 16)
+        (tcod:console-init-root 80 25 "Test" nil :renderer-sdl)
+        (tcod:console-clear tcod:*root*)
+        (tcod:console-print tcod:*root* 1 1 "Hello, world!~%")
+        (tcod:console-wait-for-keypress t)
 
 ## Differences between CL-TCOD and libtcod
 
@@ -216,12 +216,12 @@ becomes:
 ### Coverage
 
 Does not provide wrappers for:
-- File parser. Using this from lisp would be a very cumbersome way to read
+* File parser. Using this from lisp would be a very cumbersome way to read
   values from a file, as the resulting values are not lisp objects. You would
   be better to either consider using the lisp
   `read` function, or looking into lisp libraries for parser generation.
-- `namegen-get-sets` -- I haven't yet implemented this as it will have to
+* `namegen-get-sets` -- I haven't yet implemented this as it will have to
   involve converting from libtcod's bespoke 'linked list' to a lisp list.
   You may be better to write your random name generator in lisp (fairly trivial).
-- `sys-get-directory-content`, `sys-file-exists`, `sys-is-directory`,
+* `sys-get-directory-content`, `sys-file-exists`, `sys-is-directory`,
   `sys-delete-file`: Common Lisp already has functions that do the same thing.
