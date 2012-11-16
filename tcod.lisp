@@ -513,7 +513,7 @@ with libtcod.
    is a function containing the code below.
 
 ;;;   (tcod:console-set-custom-font \"terminal.png\" '(:font-layout-ascii-in-row) 16 16)
-;;;   (tcod:console-init-root 80 25 \"Test\" nil :renderer-sdl)
+;;;   (tcod:console-init-root 80 25 :title \"Test\")
 ;;;   (tcod:console-clear tcod:*root*)
 ;;;   (tcod:console-print tcod:*root* 1 1 \"Hello, world!~%\")
 ;;;   (tcod:console-wait-for-keypress t)
@@ -1698,20 +1698,27 @@ value (#xRRGGBB)."
 
 ;;TCODLIB_API void TCOD_console_init_root(int w, int h, const char * title,
 ;;                                        bool fullscreen);
-(define-c-function ("TCOD_console_init_root" console-init-root) :void
-    ((width :int) (height :int) (title :string) (fullscreen? :boolean)
-     (renderer renderer))
+
+(defcfun ("TCOD_console_init_root" %console-init-root) :void
+  (width :int) (height :int) (title :string) (fullscreen? :boolean)
+  (renderer renderer))
+
+
+(defun* console-init-root ((width uint) (height uint)
+                           &key (title "libtcod")
+                                 (fullscreen? nil)
+                                 (renderer :RENDERER-GLSL))
   (check-type width ucoord)
   (check-type height ucoord)
   (setf (gethash *root* *console-width-table*) width)
   (setf (gethash *root* *console-height-table*) height)
-  (call-it))
+  (%console-init-root width height title fullscreen? renderer))
 
 
-;;TCODLIB_API void TCOD_console_set_custom_font(const char *fontFile,
-;;                        int char_width, int char_height, int nb_char_horiz,
-;;                        int nb_char_vertic, bool chars_by_row,
-;;                        TCOD_color_t key_color);
+;;TCODLIB_API void TCOD_console_set_custom_font(const char *fontFile, int
+;;                        char_width, int char_height, int nb_char_horiz, int
+;;                        nb_char_vertic, bool chars_by_row, TCOD_color_t
+;;                        key_color);
 (define-c-function ("TCOD_console_set_custom_font" console-set-custom-font)
     :void
     ((fontfile :string) (flags custom-font-flags)
@@ -3645,7 +3652,7 @@ the coordinates of the new location."
 
 
 (defun hello-world ()
-  (tcod:console-init-root 80 50 "Libtcod Hello World" nil :renderer-sdl)
+  (tcod:console-init-root 80 50 :title "Libtcod Hello World")
   (tcod:console-set-alignment *root* :center)
   (tcod:console-print tcod:*root* 40 25 "Hello World!")
   (tcod:console-flush)
