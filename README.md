@@ -216,6 +216,7 @@ becomes:
 ### Coverage
 
 Does not provide wrappers for:
+
 * File parser. Using this from lisp would be a very cumbersome way to read
   values from a file, as the resulting values are not lisp objects. You would
   be better to either consider using the lisp

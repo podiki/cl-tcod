@@ -91,6 +91,7 @@
    #:background-add-alpha
    ;; [[Console]] ==========================================================
    #:console-init-root
+   #:console-initialised?
    #:console-set-window-title
    #:console-is-fullscreen?
    #:console-set-fullscreen
@@ -807,6 +808,10 @@ Help & advice with lisp:
 avoid crashes which occur in some CL implementations when you load
 an already-loaded foreign library.")
 
+(defvar *root-console-initialised?* nil
+  "Set to T once `console-init-root' has been called.")
+
+
 (eval-when (:load-toplevel :execute)
 	(unless *libtcod-loaded*
 		(use-foreign-library libtcod)
@@ -1505,16 +1510,21 @@ return values."
 (defun color->grayscale (col) (colour->grayscale col))
 
 
-(defun* (colour -> colournum) ((keywd (or colournum symbol)))
+(defun* (colour -> colournum) ((keywd (or colournum symbol))
+                               &optional (error? nil))
   "Given a colour keyword such as :GREY, return its corresponding RGB
-value (#xRRGGBB)."
+value (#xRRGGBB). If the keyword is unrecognised, then either return
+a light grey colour, or raise an error (if `error?' is non-nil)."
   (cond
     ((integerp keywd)
      keywd)
     (t
      (unless *colour-table*
        (start-colours))
-     (gethash keywd *colour-table*))))
+     (or (gethash keywd *colour-table*)
+         (if error? (error "Unrecognised colour name `~S'" keywd))
+         #xD3D3D3))))
+
 (declaim (inline color))
 (defun color (keywd) (colour keywd))
 
@@ -1712,8 +1722,13 @@ value (#xRRGGBB)."
   (check-type height ucoord)
   (setf (gethash *root* *console-width-table*) width)
   (setf (gethash *root* *console-height-table*) height)
-  (%console-init-root width height title fullscreen? renderer))
+  (%console-init-root width height title fullscreen? renderer)
+  (setf *root-console-initialised?* t)
+  *root*)
 
+
+(defun* (console-initialised? -> boolean) ()
+  *root-console-initialised?*)
 
 ;;TCODLIB_API void TCOD_console_set_custom_font(const char *fontFile, int
 ;;                        char_width, int char_height, int nb_char_horiz, int
@@ -1879,7 +1894,7 @@ value (#xRRGGBB)."
 ;;TCODLIB_API void TCOD_console_put_char(TCOD_console_t con,int x, int y,
 ;;                                       int c, TCOD_bkgnd_flag_t flag);
 (define-c-function ("TCOD_console_put_char" console-put-char) :void
-    ((con console) (x :int) (y :int) (ch :unsigned-char)
+    ((con console) (x :int) (y :int) (ch :unsigned-int)
      (flag background-flag))
   (assert (legal-console-coordinates? con x y))
   (call-it))
@@ -1887,7 +1902,7 @@ value (#xRRGGBB)."
 
 (define-c-function ("TCOD_console_put_char_ex_wrapper" console-put-char-ex)
     :void
-    ((con console) (x :int) (y :int) (ch :unsigned-char) (fg colournum)
+    ((con console) (x :int) (y :int) (ch :unsigned-int) (fg colournum)
      (bg colournum))
   (assert (legal-console-coordinates? con x y))
   (call-it))
@@ -2964,7 +2979,7 @@ in =IMAGE=.")
 (defcfun ("TCOD_noise_new" %noise-new) noise
   (dimensions :int) (hurst :float) (lacunarity :float) (randomptr :pointer))
 
-(defun* (noise-new -> noise) ((dimensions uint8)
+(defun* (noise-new -> noise) ((dimensions (integer 1 4))
                               &key ((hurst float) +NOISE-DEFAULT-HURST+)
                               ((lacunarity float) +NOISE-DEFAULT-LACUNARITY+)
                               ((rng randomptr) +NULL+))
