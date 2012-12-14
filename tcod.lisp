@@ -47,6 +47,8 @@
    #:compose-color
    #:decompose-colour
    #:decompose-color
+   #:colour->keyword
+   #:color->keyword
    #:colour-rgb
    #:color-rgb
    #:colour-hsv
@@ -1060,14 +1062,26 @@ name."
   :CHAR)
 
 
-;; TCOD_key_t
-;; This is no longer used -- key structs are converted to a bitfield by
-;; wrapper functions in libtcod.
+;;; TCOD_key_t
+;;; Mac OSX appears not to "pack" binary flags in this structure - each flag
+;;; takes up an entire byte.
+
+#-darwin
 (defcstruct key-press
   (vk keycode)                        ; character if vk == TCODK_CHAR else 0
   (c :unsigned-char)
-  (flags :uint8))                  ; does this correspond to a key press or key
-                                   ; release event ?
+  (flags :uint8))
+
+#+darwin
+(defcstruct key-press
+  (vk keycode)                        ; character if vk == TCODK_CHAR else 0
+  (c :unsigned-char)
+  (flag-pressed :uint8)
+  (flag-lalt :uint8)
+  (flag-lctrl :uint8)
+  (flag-ralt :uint8)
+  (flag-rctrl :uint8)
+  (flag-shift :uint8))
 
 
 (defstruct key
@@ -1529,6 +1543,18 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 (defun color (keywd) (colour keywd))
 
 
+(defun* (colour->keyword -> (or keyword null)) ((colournum colournum))
+  (maphash
+   (lambda (k v)
+     (if (= v colournum)
+         (return-from colour->keyword k)))
+   *colour-table*))
+
+
+(defun* (color->keyword -> (or keyword null)) ((colournum colournum))
+  (colour->keyword colournum))
+
+
 (defun colctrl->char (ctrl)
   (code-char (foreign-enum-value 'colctrl ctrl)))
 
@@ -1734,14 +1760,23 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;;                        char_width, int char_height, int nb_char_horiz, int
 ;;                        nb_char_vertic, bool chars_by_row, TCOD_color_t
 ;;                        key_color);
-(define-c-function ("TCOD_console_set_custom_font" console-set-custom-font)
+(defcfun ("TCOD_console_set_custom_font" %console-set-custom-font)
     :void
-    ((fontfile :string) (flags custom-font-flags)
-     (chars-horizontal :int) (chars-vertical :int))
+  (fontfile :string) (flags custom-font-flags)
+  (chars-horizontal :int) (chars-vertical :int))
+
+
+(defun* (console-set-custom-font -> (values)) ((fontfile (or string pathname))
+                                               (flags list)
+                                               &optional (chars-horizontal 0)
+                                                         (chars-vertical 0))
   (assert (probe-file fontfile))
+  (if (pathnamep fontfile)
+      (setf fontfile (namestring fontfile)))
   (check-type chars-horizontal (unsigned-byte 16))
   (check-type chars-vertical (unsigned-byte 16))
-  (call-it))
+  (%console-set-custom-font fontfile flags chars-horizontal chars-vertical)
+  (values))
 
 
 ;; TCODLIB_API void TCOD_console_map_ascii_code_to_font(int asciiCode,
@@ -1869,17 +1904,18 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;;TCODLIB_API void TCOD_console_set_char(TCOD_console_t con,int x, int y,
 ;; int c);
 (defcfun ("TCOD_console_set_char" %console-set-char) :void
-    (con console) (x :int) (y :int) (ch :unsigned-char))
+    (con console) (x :int) (y :int) (ch :unsigned-int))
 
 
-(defun* console-set-char ((con console) (x integer) (y integer) ch)
+(defun* console-set-char ((con console) (x integer) (y integer)
+                          (ch (or character integer)))
   (assert (legal-console-coordinates? con x y))
   (when (characterp ch)
     (setf ch (char-code ch)))
   (%console-set-char con x y ch))
 
 
-(defun* (console-fill-char -> null)  ((con console) (ch (or character uchar))
+(defun* (console-fill-char -> null)  ((con console) (ch (or character uint))
                                       (fx ucoord) (fy ucoord)
                                       (fw ucoord) (fh ucoord))
   "Fill a rectangular area with the character CH."
@@ -2354,17 +2390,30 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 
 ;;;; <<Keyboard input>> ========================================================
 
-
+#-darwin
 (defun key->keypress (keyptr)
   (let ((flags (foreign-slot-value keyptr 'key-press 'flags)))
-    (make-key :vk (foreign-slot-value keyptr 'key-press 'vk)
-           :c (code-char (foreign-slot-value keyptr 'key-press 'c))
-           :pressed (get-bit flags 1)
-           :lalt (get-bit flags 2)
-           :lctrl (get-bit flags 3)
-           :ralt (get-bit flags 4)
-           :rctrl (get-bit flags 5)
-           :shift (get-bit flags 6))))
+    (make-key
+     :vk (foreign-slot-value keyptr 'key-press 'vk)
+     :c (code-char (foreign-slot-value keyptr 'key-press 'c))
+     :pressed (get-bit flags 1)
+     :lalt (get-bit flags 2)
+     :lctrl (get-bit flags 3)
+     :ralt (get-bit flags 4)
+     :rctrl (get-bit flags 5)
+     :shift (get-bit flags 6))))
+
+#+darwin
+(defun key->keypress (keyptr)
+  (make-key
+   :vk (foreign-slot-value keyptr 'key-press 'vk)
+   :c (code-char (foreign-slot-value keyptr 'key-press 'c))
+   :pressed (plusp (foreign-slot-value keyptr 'key-press 'flag-pressed))
+   :lalt (plusp (foreign-slot-value keyptr 'key-press 'flag-lalt))
+   :lctrl (plusp (foreign-slot-value keyptr 'key-press 'flag-lctrl))
+   :ralt (plusp (foreign-slot-value keyptr 'key-press 'flag-ralt))
+   :rctrl (plusp (foreign-slot-value keyptr 'key-press 'flag-rctrl))
+   :shift (plusp (foreign-slot-value keyptr 'key-press 'flag-shift))))
 
 
 (defun key-bitfield->vk (key-bf)
