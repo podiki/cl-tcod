@@ -429,6 +429,7 @@
    ;; [[SDL]] =================================================================
    #:sdl-get-mouse-status
    ;; [[Testing]] =============================================================
+   #:hello-world
    )
   (:documentation
    "* Introduction
@@ -815,9 +816,9 @@ an already-loaded foreign library.")
 
 
 (eval-when (:load-toplevel :execute)
-	(unless *libtcod-loaded*
-		(use-foreign-library libtcod)
-		(setf *libtcod-loaded* t)))
+        (unless *libtcod-loaded*
+                (use-foreign-library libtcod)
+                (setf *libtcod-loaded* t)))
 
 ;;; We need direct access to SDL because libtcod 1.5.1rc1 does not report
 ;;; mouse buttons correctly (or at least, reading them via CFFI gives
@@ -1295,7 +1296,7 @@ to the structure used by libtcod."
   (dy 0 :type sint16)
   (cx 0 :type uint16) ;; cell coordinates in the root console
   (cy 0 :type uint16)
-  (dcx 0 :type sint16)	;; movement since last update in console cells
+  (dcx 0 :type sint16)  ;; movement since last update in console cells
   (dcy 0 :type sint16)
   (lbutton nil :type boolean)                ;; left button status
   (rbutton nil :type boolean)                ;; right button status
