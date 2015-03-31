@@ -1,7 +1,7 @@
 ;;;; -*- Mode: lisp; indent-tabs-mode: nil -*-
 
 (defpackage #:tcod-system
-	(:use #:cl #:asdf))
+        (:use #:cl #:asdf))
 
 (in-package #:tcod-system)
 
@@ -11,4 +11,4 @@ terminal-emulation library written in C."
     :author "Paul Sexton <eeeickythump@gmail.com>"
     :components
     ((:file "tcod") (:file "tcod-colours"))
-    :depends-on ("cffi" "defstar"))
+    :depends-on ("cffi" "cffi-libffi" "defstar"))

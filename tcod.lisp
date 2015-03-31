@@ -859,7 +859,7 @@ name which is satisified by any of the values allowed by the enum type."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (progn
        (defcenum ,name ,@vals)
-       (deftype ,name ()
+       (deftype ,(if (listp name) (car name) name) ()
          '(member ,@(mapcar #'(lambda (val)
                                 (if (listp val) (car val) val))
                             vals))))))
@@ -928,12 +928,11 @@ is satisfied by a list containing only bitfield keywords as members."
          (t
           (defcfun (,foreign-fn-name ,(prepend-percent fn-name)) ,return-type
             ,@args)
-          (declaim (inline ,fn-name))
           (defun* (,fn-name -> ,(c-type->lisp-type return-type))
               ,(mapcar #'(lambda (clause)
                            `(,(first clause) ,(c-type->lisp-type (second clause))
-                              ,@(cddr clause)))
-                       args-no-rest)
+                             ,@(cddr clause)))
+                args-no-rest)
             ,@(if (stringp (car body)) (list (pop body)) nil)
             ,(if body
                  `(macrolet ((call-it (&rest callargs)
@@ -980,7 +979,7 @@ name."
 
 ;; TCOD_color_t
 ;; This is seldom used -- colournums are used instead (see above).
-(defcstruct colour
+(defcstruct colour-struct
   (r :uint8)
   (g :uint8)
   (b :uint8))
@@ -994,7 +993,9 @@ name."
 
 
 ;; TCOD_keycode_t (enum)
-(define-c-enum keycode
+(define-c-enum
+    #-darwin keycode
+    #+darwin (keycode :uint32)
   :NONE
   :ESCAPE
   :BACKSPACE
@@ -1060,23 +1061,25 @@ name."
   :NUMLOCK
   :SCROLLLOCK
   :SPACE
-  :CHAR)
+  :CHAR
+  :TEXT)
 
 
 ;;; TCOD_key_t
-;;; Mac OSX appears not to "pack" binary flags in this structure - each flag
-;;; takes up an entire byte.
-
 #-darwin
 (defcstruct key-press
-  (vk keycode)                        ; character if vk == TCODK_CHAR else 0
+  (vk keycode)
   (c :unsigned-char)
+  (text :uint8 :count 32)
   (flags :uint8))
 
+;;; Horrendous problems getting this to work on OSX. The `keycode' enum type
+;;; must be a 4-byte int (forced in its definition above).
 #+darwin
 (defcstruct key-press
-  (vk keycode)                        ; character if vk == TCODK_CHAR else 0
-  (c :unsigned-char)
+  (vk keycode)
+  (c :uint8)
+  (text :uint8 :count 32)
   (flag-pressed :uint8)
   (flag-lalt :uint8)
   (flag-lctrl :uint8)
@@ -1100,7 +1103,7 @@ to the structure used by libtcod."
 
 (define-c-enum event
     (:EVENT-NONE 0)
-    (:EVENT-KEY-PRESS 1)
+  (:EVENT-KEY-PRESS 1)
   (:EVENT-KEY-RELEASE 2)
   (:EVENT-KEY 3)                        ; PRESS | RELEASE
   (:EVENT-MOUSE-MOVE 4)
@@ -1333,7 +1336,8 @@ to the structure used by libtcod."
 (defun* (get-bit -> boolean) ((n integer) (pos uint8))
   "Return the bit at position POS within the integer N (represented as
 a bitfield). POS = 1 refers to the 1's (rightmost) bit."
-  (/= 0 (logand n (expt 2 (1- pos)))))
+  ;;(/= 0 (logand n (expt 2 (1- pos))))
+  (logtest n (ash 1 (1- pos))))
 
 
 
@@ -1384,7 +1388,6 @@ defined by [[deftype]]."
     "Given three integer values R, G and B, representing the red, green and
 blue components of a colour, return a 3 byte integer whose value is #xBBGGRR."
     (+ (ash b 16) (ash g 8) r))
-  (declaim (inline compose-color))
   (defun compose-color (r g b) (compose-colour r g b)))
 
 
@@ -1434,18 +1437,16 @@ components."
   "Given a colournum #xBBGGRR, return R, G and B integer values as 3 separate
 return values."
   (values
-         (logand num #x0000ff)
-         (ash (logand num #x00ff00) -8)
-         (ash (logand num #xff0000) -16)
-         ))
-(declaim (inline decompose-color))
+   (logand num #x0000ff)
+   (ash (logand num #x00ff00) -8)
+   (ash (logand num #xff0000) -16)
+   ))
 (defun decompose-color (num) (decompose-colour num))
 
 
 (defun* (invert-colour -> colournum) ((num colournum))
   (multiple-value-bind (r g b) (decompose-colour num)
     (compose-colour (- 255 r) (- 255 g) (- 255 b))))
-(declaim (inline invert-color))
 (defun invert-color (num) (invert-colour num))
 
 
@@ -1540,7 +1541,6 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
          (if error? (error "Unrecognised colour name `~S'" keywd))
          #xD3D3D3))))
 
-(declaim (inline color))
 (defun color (keywd) (colour keywd))
 
 
@@ -1563,23 +1563,20 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 
 ;; TCODLIB_API bool TCOD_color_equals (TCOD_color_t c1, TCOD_color_t c2);
 (define-c-function ("TCOD_color_equals_wrapper" colour-equals?) :boolean
-        ((c1 colournum) (c2 colournum)))
-(declaim (inline color-equals?))
+  ((c1 colournum) (c2 colournum)))
 (defun color-equals? (c1 c2)
   (colour-equals? c1 c2))
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_color_add (TCOD_color_t c1, TCOD_color_t c2);
 (define-c-function ("TCOD_color_add_wrapper" colour-add) colournum
-        ((c1 colournum) (c2 colournum)))
-(declaim (inline color-add))
+  ((c1 colournum) (c2 colournum)))
 (defun color-add (c1 c2)
   (colour-add c1 c2))
 
 
 (define-c-function ("TCOD_color_subtract_wrapper" colour-subtract) colournum
-        ((c1 colournum) (c2 colournum)))
-(declaim (inline color-subtract))
+  ((c1 colournum) (c2 colournum)))
 (defun color-subtract (c1 c2)
   (colour-subtract c1 c2))
 
@@ -1587,8 +1584,7 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;;TCODLIB_API TCOD_color_t TCOD_color_multiply (TCOD_color_t c1,
 ;; TCOD_color_t c2);
 (define-c-function ("TCOD_color_multiply_wrapper" colour-multiply) colournum
-        ((c1 colournum) (c2 colournum)))
-(declaim (inline color-multiply))
+  ((c1 colournum) (c2 colournum)))
 (defun color-multiply (c1 c2)
   (colour-multiply c1 c2))
 
@@ -1596,9 +1592,8 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;;TCODLIB_API TCOD_color_t TCOD_color_multiply_scalar (TCOD_color_t c1,
 ;; float value);
 (define-c-function ("TCOD_color_multiply_scalar_wrapper" colour-multiply-scalar)
-    colournum
-    ((c1 colournum) (value :float)))
-(declaim (inline color-multiply-scalar))
+  colournum
+  ((c1 colournum) (value :float)))
 (defun color-multiply-scalar (c1 value)
   (colour-multiply-scalar c1 value))
 
@@ -1606,8 +1601,7 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;; TCODLIB_API TCOD_color_t TCOD_color_lerp(TCOD_color_t c1, TCOD_color_t c2,
 ;; float coef);
 (define-c-function ("TCOD_color_lerp_wrapper" colour-lerp) colournum
-        ((c1 colournum) (c2 colournum) (coef :float)))
-(declaim (inline color-lerp))
+  ((c1 colournum) (c2 colournum) (coef :float)))
 (defun color-lerp (c1 c2 coef)
   (colour-lerp c1 c2 coef))
 
@@ -1615,8 +1609,7 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;; TCODLIB_API void TCOD_color_set_HSV(TCOD_color_t *c,float h, float s,
 ;; float v);
 (define-c-function ("TCOD_color_set_HSV" colour-set-hsv) :void
-        ((con :pointer) (hue :float) (sat :float) (v :float)))
-(declaim (inline color-set-hsv))
+  ((con :pointer) (hue :float) (sat :float) (v :float)))
 (defun color-set-hsv (con hue sat v)
   (colour-set-hsv con hue sat v))
 
@@ -1672,12 +1665,6 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
   (destructuring-bind (h s v) (colour-get-hsv colour)
     (colour-hsv h (clamp 0.0 1.0 (* s scoef)) (clamp 0.0 1.0 (* v vcoef)))))
 
-
-(declaim (inline color-get-hsv color-get-hue color-get-saturation
-                 color-get-value
-                 color-set-hue color-set-saturation
-                 color-set-value
-                 color-shift-hue))
 
 (defun color-get-hsv (colour)
   (colour-get-hsv colour))
@@ -1822,17 +1809,15 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;;TCODLIB_API void TCOD_console_set_background_color(TCOD_console_t con,
 ;; TCOD_color_t col);
 (define-c-function ("TCOD_console_set_default_background_wrapper"
-          console-set-default-background) :void
-        ((con console) (col colournum)))
-(declaim (inline console-set-default-background))
+                    console-set-default-background) :void
+  ((con console) (col colournum)))
 
 
 ;;TCODLIB_API void TCOD_console_set_foreground_color(TCOD_console_t con,
 ;;                                                   TCOD_color_t col);
 (define-c-function ("TCOD_console_set_default_foreground_wrapper"
-          console-set-default-foreground) :void
-        ((con console) (col colournum)))
-(declaim (inline console-set-default-foreground))
+                    console-set-default-foreground) :void
+  ((con console) (col colournum)))
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_background_color(TCOD_console_t
@@ -1840,19 +1825,17 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 (define-c-function ("TCOD_console_get_default_background_wrapper"
                     console-get-default-background) colournum
   ((con console)))
-(declaim (inline console-get-default-background))
 
 
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_foreground_color(TCOD_console_t con);
 (define-c-function ("TCOD_console_get_default_foreground_wrapper"
                     console-get-default-foreground) colournum
   ((con console)))
-(declaim (inline console-get-default-foreground))
 
 
 ;;TCODLIB_API void TCOD_console_clear(TCOD_console_t con);
 (define-c-function ("TCOD_console_clear" console-clear) :void
-        ((con console)))
+  ((con console)))
 
 
 ;; New in 1.5.0rc1
@@ -2188,9 +2171,8 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 
 ;;TCODLIB_API TCOD_color_t TCOD_console_get_fading_color();
 (define-c-function ("TCOD_console_get_fading_color_wrapper"
-          console-get-fading-color) colournum
-    ())
-(declaim (inline console-get-fading-colour))
+                    console-get-fading-color) colournum
+  ())
 (defun console-get-fading-colour ()
   (console-get-fading-color))
 
@@ -2204,10 +2186,9 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 ;;     TCOD_color_t fore, TCOD_color_t back);
 ;; This is to do with "colour control" strings
 (define-c-function ("TCOD_console_set_color_control_wrapper"
-          console-set-colour-control) :void
+                    console-set-colour-control) :void
   ((control-num colctrl) (fore colournum) (back colournum)))
 
-(declaim (inline console-set-color-control))
 (defun console-set-color-control (control-num fore back)
   (console-set-colour-control control-num fore back))
 
@@ -2369,7 +2350,7 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
                                   (lisp-string-to-foreign str strbuf
                                                           (length str)
                                                           :encoding :utf-16)))))
-
+`<
 
 (defcfun ("TCOD_console_get_height_rect_utf" %console-get-height-rect-utf) :void
   (con console) (x :int) (y :int) (w :int) (h :int)
@@ -2393,10 +2374,10 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 
 #-darwin
 (defun key->keypress (keyptr)
-  (let ((flags (foreign-slot-value keyptr 'key-press 'flags)))
+  (let ((flags (foreign-slot-value keyptr '(:struct key-press) 'flags)))
     (make-key
-     :vk (foreign-slot-value keyptr 'key-press 'vk)
-     :c (code-char (foreign-slot-value keyptr 'key-press 'c))
+     :vk (foreign-slot-value keyptr '(:struct key-press) 'vk)
+     :c (code-char (foreign-slot-value keyptr '(:struct key-press) 'c))
      :pressed (get-bit flags 1)
      :lalt (get-bit flags 2)
      :lctrl (get-bit flags 3)
@@ -2404,17 +2385,33 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
      :rctrl (get-bit flags 5)
      :shift (get-bit flags 6))))
 
+
 #+darwin
 (defun key->keypress (keyptr)
-  (make-key
-   :vk (foreign-slot-value keyptr 'key-press 'vk)
-   :c (code-char (foreign-slot-value keyptr 'key-press 'c))
-   :pressed (plusp (foreign-slot-value keyptr 'key-press 'flag-pressed))
-   :lalt (plusp (foreign-slot-value keyptr 'key-press 'flag-lalt))
-   :lctrl (plusp (foreign-slot-value keyptr 'key-press 'flag-lctrl))
-   :ralt (plusp (foreign-slot-value keyptr 'key-press 'flag-ralt))
-   :rctrl (plusp (foreign-slot-value keyptr 'key-press 'flag-rctrl))
-   :shift (plusp (foreign-slot-value keyptr 'key-press 'flag-shift))))
+  (with-foreign-slots ((vk c text flag-pressed flag-lalt flag-lctrl flag-ralt
+                           flag-rctrl flag-shift)
+                       keyptr (:struct key-press))
+    ;; (loop for i from 0 upto 45 do
+    ;;   (format t "~D:~S " i (mem-ref keyptr :uint8 i)))
+    ;; (terpri)
+    (make-key :vk vk :c (code-char c)
+              :pressed (not (zerop flag-pressed))
+              :lalt (not (zerop flag-lalt))
+              :ralt (not (zerop flag-ralt))
+              :lctrl (not (zerop flag-lctrl))
+              :rctrl (not (zerop flag-rctrl))
+              :shift (not (zerop flag-shift)))))
+
+
+  ;; (make-key
+  ;;  :vk (foreign-slot-value keyptr '(:struct key-press) 'vk)
+  ;;  :c (code-char (foreign-slot-value keyptr '(:struct key-press) 'c))
+  ;;  :pressed (foreign-slot-value keyptr '(:struct key-press) 'flag-pressed)
+  ;;  :lalt (foreign-slot-value keyptr '(:struct key-press) 'flag-lalt)
+  ;;  :lctrl (foreign-slot-value keyptr '(:struct key-press) 'flag-lctrl)
+  ;;  :ralt (foreign-slot-value keyptr '(:struct key-press) 'flag-ralt)
+  ;;  :rctrl (foreign-slot-value keyptr '(:struct key-press) 'flag-rctrl)
+  ;;  :shift (foreign-slot-value keyptr '(:struct key-press) 'flag-shift)))
 
 
 (defun key-bitfield->vk (key-bf)
@@ -2422,53 +2419,13 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
                         (logand (ash key-bf -16) #x00FF)))
 
 
-;; (defun* key->keypress ((key-bf (unsigned-byte 32)))
-;;   (let ((flags (ash key-bf -24)))
-;;     (make-key :vk (key-bitfield->vk key-bf) ;;(ldb (byte 8 16) key-bf)
-;;               :c (code-char (logand key-bf #x0000FFFF))  ;;(ldb (byte 16 0) key-bf)
-;;               :pressed (get-bit flags 1)
-;;               :lalt (get-bit flags 2)
-;;               :lctrl (get-bit flags 3)
-;;               :ralt (get-bit flags 4)
-;;               :rctrl (get-bit flags 5)
-;;               :shift (get-bit flags 6))))
+(defcfun ("TCOD_console_check_for_keypress" console-check-for-keypress)
+    (:struct key-press)
+  (flags key-state))
 
-
-;;TCODLIB_API TCOD_key_t TCOD_console_check_for_keypress(int flags);
-(defcfun ("TCOD_console_check_for_keypress_wrapper"
-          %console-check-for-keypress) :boolean
-    (keyptr :pointer) (flags key-state))
-
-
-;; (defun* (console-check-for-keypress -> (or null key)) ((flags key-state))
-;;   (let* ((keyptr pointer)
-;;          (pressed? (%console-check-for-keypress keyptr flags)))
-;;     (if pressed?
-;;         (key->keypress keyptr)          ;!!
-;;         nil)))
-
-
-(defun* console-check-for-keypress ((flags key-state))
-  (with-foreign-object (keyptr 'key-press)
-    (if (%console-check-for-keypress keyptr flags)
-        (key->keypress keyptr))))
-
-
-;;TCODLIB_API TCOD_key_t TCOD_console_wait_for_keypress(bool flush);
-(defcfun ("TCOD_console_wait_for_keypress_wrapper"
-          %console-wait-for-keypress) :void
-  (keyptr :pointer) (flush? :boolean))
-
-
-;; (defun* console-wait-for-keypress ((flush? boolean))
-;;   (key->keypress (%console-wait-for-keypress flush?)))
-
-
-
-(defun* console-wait-for-keypress ((flush? boolean))
-  (with-foreign-object (keyptr 'key-press)
-    (%console-wait-for-keypress keyptr flush?)
-    (key->keypress keyptr)))
+(defcfun ("TCOD_console_wait_for_keypress" console-wait-for-keypress)
+    (:struct key-press)
+  (flush? :boolean))
 
 
 ;;TCODLIB_API void TCOD_console_set_keyboard_repeat(int initial_delay,
@@ -2550,7 +2507,6 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
     (zip-put-char zip g)
     (zip-put-char zip b)))
 
-(declaim (inline zip-put-color))
 (defun zip-put-color (zip color)
   (zip-put-colour zip color))
 
@@ -2598,7 +2554,6 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
         (b (zip-get-char zip)))
     (compose-colour r g b)))
 
-(declaim (inline zip-get-color))
 (defun zip-get-color (zip)
   (zip-get-colour zip))
 
@@ -2622,11 +2577,11 @@ When called, returns a list of all queued events (calling the function
 also EMPTIES the queue). Each element in the list is a cons cell of the
 form (EVENT-TYPE . DATA) where EVENT-TYPE is a member of the `event' enum,
 and DATA is either a key struct or a mouse-state struct."
-  (cffi:with-foreign-objects ((keyptr 'key-press)
-                              (mouseptr 'mouse-state))
+  (cffi:with-foreign-objects ((keyptr '(:struct key-press))
+                              (mouseptr '(:struct mouse-state)))
     (loop
       for event = (sys-check-for-event :event-any keyptr mouseptr)
-      when (member event '(:event-key-release :event-key-press))
+      when (member event '(:event-key-release :event-key-press :event-key))
         collect (cons event (key->keypress keyptr))
       when (member event '(:event-mouse-release :event-mouse-press
                            :event-mouse-move))
@@ -2808,35 +2763,32 @@ and DATA is either a key struct or a mouse-state struct."
 information about the status of the mouse as at the last time
 `sys-check-for-event' was called. If you want the *current* status
 of the mouse to be returned instead, UPDATE? should be non-nil."
-  (with-foreign-object (ms 'mouse-state)
+  (with-foreign-object (msptr '(:struct mouse-state))
     (cond
       (update?
        ;; sys-check-for-event only checks and removes ONE event.
-       (sys-check-for-event :event-any +null+ ms))
+       (sys-check-for-event :event-any +null+ msptr))
       (t
-       (%mouse-get-status ms)))
-    (parse-mouse-state ms)))
+       (%mouse-get-status msptr)))
+    (parse-mouse-state msptr)))
+
+
+;;(defctype mouse-state-pointer (:pointer (:struct mouse-state)))
 
 
 (defun parse-mouse-state (mouseptr)
-  (make-mouse :x (foreign-slot-value mouseptr 'mouse-state 'x)
-              :y (foreign-slot-value mouseptr 'mouse-state 'y)
-              :dx (foreign-slot-value mouseptr 'mouse-state 'dx)
-              :dy (foreign-slot-value mouseptr 'mouse-state 'dy)
-              :cx (foreign-slot-value mouseptr 'mouse-state 'cx)
-              :cy (foreign-slot-value mouseptr 'mouse-state 'cy)
-              :dcx (foreign-slot-value mouseptr 'mouse-state 'dcx)
-              :dcy (foreign-slot-value mouseptr 'mouse-state 'dcy)
-              :lbutton (foreign-slot-value mouseptr 'mouse-state 'lbutton)
-              :rbutton (foreign-slot-value mouseptr 'mouse-state 'rbutton)
-              :mbutton (foreign-slot-value mouseptr 'mouse-state 'mbutton)
-              :lbutton-pressed (foreign-slot-value mouseptr 'mouse-state
-                                                   'lbutton-pressed)
-              :rbutton-pressed (foreign-slot-value mouseptr 'mouse-state
-                                                   'rbutton-pressed)
-              :mbutton-pressed (foreign-slot-value mouseptr 'mouse-state
-                                                   'mbutton-pressed)
-              ))
+  (with-foreign-slots ((x y dx dy cx cy dcx dcy
+                          lbutton rbutton mbutton
+                          lbutton-pressed rbutton-pressed
+                          mbutton-pressed wheel-up wheel-down)
+                       mouseptr (:struct mouse-state))
+    (make-mouse :x x :y y :dx dx :dy dy
+                :cx cx :cy cy :dcx dcx :dcy dcy
+                :lbutton lbutton :rbutton rbutton :mbutton mbutton
+                :lbutton-pressed lbutton-pressed
+                :rbutton-pressed rbutton-pressed
+                :mbutton-pressed mbutton-pressed
+                :wheel-up wheel-up :wheel-down wheel-down)))
 
 
 ;;TCODLIB_API TCOD_mouse_t TCOD_mouse_get_status();
@@ -2989,7 +2941,6 @@ in =IMAGE=.")
 ;; TCOD_color_t key_color);
 (define-c-function ("TCOD_image_set_key_color" image-set-key-color) :void
   ((image image) (key-color colournum)))
-(declaim (inline image-set-key-colour))
 (defun image-set-key-colour (image key-colour)
   (image-set-key-color image key-colour))
 
@@ -3056,7 +3007,8 @@ in =IMAGE=.")
   "Returns the flat noise function at the given coordinates."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+      (setf (mem-aref f :float i) (coerce (coerce (nth i nums) 'real)
+                                          'single-float)))
     (%noise-get noise f)))
 
 (defcfun ("TCOD_noise_get_ex" %noise-get-ex) :float
@@ -3068,7 +3020,8 @@ in =IMAGE=.")
 using noise type NOISE-TYPE."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+      (setf (mem-aref f :float i) (coerce (coerce (nth i nums) 'real)
+                                          'single-float)))
     (%noise-get-ex noise f noise-type)))
 
 ;;; noise-get-FBM =============================================================
@@ -3080,7 +3033,8 @@ using noise type NOISE-TYPE."
   "Returns the fractional Brownian motion function at the given coordinates."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+      (setf (mem-aref f :float i) (coerce (coerce (nth i nums) 'real)
+                                          'single-float)))
     (%noise-get-fbm noise f octaves)))
 
 (defcfun ("TCOD_noise_get_fbm_ex" %noise-get-fbm-ex) :float
@@ -3092,7 +3046,8 @@ using noise type NOISE-TYPE."
 using noise type NOISE-TYPE."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+      (setf (mem-aref f :float i) (coerce (coerce (nth i nums) 'real)
+                                          'single-float)))
     (%noise-get-fbm-ex noise f octaves noise-type)))
 
 
@@ -3107,7 +3062,8 @@ using noise type NOISE-TYPE."
   "Returns the turbulence function at the given coordinates."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+      (setf (mem-aref f :float i) (coerce (coerce (nth i nums) 'real)
+                                          'single-float)))
     (%noise-get-turbulence noise f octaves)))
 
 (defcfun ("TCOD_noise_get_turbulence_ex" %noise-get-turbulence-ex) :float
@@ -3120,7 +3076,8 @@ using noise type NOISE-TYPE."
 using noise type NOISE-TYPE."
   (with-foreign-object (f :float (length nums))
     (dotimes (i (length nums))
-      (setf (mem-aref f :float i) (coerce (nth i nums) 'single-float)))
+      (setf (mem-aref f :float i) (coerce (coerce (nth i nums) 'real)
+                                          'single-float)))
     (%noise-get-turbulence-ex noise f octaves noise-type)))
 
 
@@ -3251,7 +3208,6 @@ than =WATERLEVEL=.")
 =MIN= and the highest is equal to =MAX=.")
 
 
-(declaim (inline heightmap-normalise))
 (defun heightmap-normalise (heightmap min max)
   (heightmap-normalize heightmap min max))
 
