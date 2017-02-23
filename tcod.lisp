@@ -826,18 +826,18 @@ an already-loaded foreign library.")
 ;;; mouse buttons correctly (or at least, reading them via CFFI gives
 ;;; strange, random results.)
 
-(define-foreign-library libsdl
-  (:darwin "libSDL.dylib")
-  (:unix "libSDL.so")
-  (:windows "SDL.dll")
-  (t (:default "libsdl")))
+(define-foreign-library libsdl2
+  (:darwin "libSDL2.dylib")
+  (:unix "libSDL2.so")
+  (:windows "SDL2.dll")
+  (t (:default "libsdl2")))
 
-(defvar *libsdl-loaded* nil)
+(defvar *libsdl2-loaded* nil)
 
 (eval-when (:load-toplevel :execute)
-  (unless *libsdl-loaded*
-    (use-foreign-library libsdl)
-    (setf *libsdl-loaded* t)))
+  (unless *libsdl2-loaded*
+    (use-foreign-library libsdl2)
+    (setf *libsdl2-loaded* t)))
 
 ;; Returns an 8-bit integer.
 ;; bit 1: lbutton
