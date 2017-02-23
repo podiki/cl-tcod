@@ -893,7 +893,8 @@ is satisfied by a list containing only bitfield keywords as members."
     "Given a CFFI foreign type, return an equivalent lisp type."
     (case c-type
       (:boolean 'boolean)
-      ((:int :unsigned-int) 'uint)
+      (:int 'int)
+      (:unsigned-int 'uint)
       (:char 'signed-char)
       (:unsigned-char 'uchar)
       (:uint8 'uint8)
@@ -968,6 +969,7 @@ name."
 (deftype uint16 () `(unsigned-byte 16))
 (deftype uint8 () `(unsigned-byte 8))
 (deftype uint () `(unsigned-byte ,(* 8 (foreign-type-size :int))))
+(deftype int () `(signed-byte ,(* 8 (foreign-type-size :int))))
 (deftype uchar () `(unsigned-byte ,(* 8 (foreign-type-size :unsigned-char))))
 (deftype signed-char () `(signed-byte ,(* 8 (foreign-type-size :char))))
 
