@@ -2443,9 +2443,11 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
     (:struct key-press)
   (flags key-state))
 
+;;; changed from :bool to :int even though it is a bool in TCOD definition
+;;; CFFI bug, see https://bugs.launchpad.net/cffi/+bug/1517578
 (defcfun ("TCOD_console_wait_for_keypress" console-wait-for-keypress)
     (:struct key-press)
-  (flush? :boolean))
+  (flush? :int))
 
 
 ;;TCODLIB_API void TCOD_console_set_keyboard_repeat(int initial_delay,
