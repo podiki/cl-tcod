@@ -425,6 +425,7 @@
    #:sys-check-for-event
    #:sys-wait-for-event
    #:sys-get-events
+   #:sys-wait-events
    #:sys-clipboard-set ;;
    #:sys-clipboard-get ;;
    #:sys-flush
@@ -1117,7 +1118,7 @@ to the structure used by libtcod."
 
 
 (define-c-enum event
-    (:EVENT-NONE 0)
+  (:EVENT-NONE 0)
   (:EVENT-KEY-PRESS 1)
   (:EVENT-KEY-RELEASE 2)
   (:EVENT-KEY 3)                        ; PRESS | RELEASE
@@ -2621,6 +2622,26 @@ and DATA is either a key struct or a mouse-state struct."
                   (cons event mouse))
       until (eql event :event-none))))
 
+(defun sys-wait-events (filter flush)
+  "Like the wrapper sys-get-events, but using TCOD_sys_wait_for_event. Takes a filter
+   for what event (`event' enum) to wait for as well as whether or not to flush
+   the event buffer of all pending events."
+  (cffi:with-foreign-objects ((keyptr '(:struct key-press))
+                              (mouseptr '(:struct mouse-state)))
+    (let ((event (sys-wait-for-event filter keyptr mouseptr flush)))
+      (if (member event '(:event-key-release :event-key-press :event-key))
+          (cons event (key->keypress keyptr))
+          (if (member event '(:event-mouse-release :event-mouse-press
+                              :event-mouse-move))
+              (let ((mouse (parse-mouse-state mouseptr))
+                    (bits (sdl-get-mouse-state +null+ +null+)))
+                (setf (mouse-lbutton mouse) (plusp (boole boole-and bits 1)))
+                (setf (mouse-mbutton mouse) (plusp (boole boole-and bits 2)))
+                (setf (mouse-rbutton mouse) (plusp (boole boole-and bits 4)))
+                (setf (mouse-lbutton-pressed mouse) nil
+                      (mouse-mbutton-pressed mouse) nil
+                      (mouse-rbutton-pressed mouse) nil)
+                (cons event mouse)))))))
 
 (define-c-function ("TCOD_sys_create_directory" sys-create-directory) :boolean
     ((path :string)))
