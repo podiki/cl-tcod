@@ -1,3 +1,13 @@
+# Note on this version
+
+This is a working temporary(?) fork of cl-tcod, residing officially
+on [Bitbucket](https://bitbucket.org/eeeickythump/cl-tcod). I am working with the
+official maintainer on these changes, so expect them to be merged back upstream at some
+point. For now though, this provides a version of cl-tcod that works with the latest
+version (and development) of libtcod, 1.6.2. This is also that version that works with
+my Common Lisp port, [cl-tcod-tutorial](https://github.com/podiki/cl-tcod-tutorial), of the
+["Complete Roguelike Tutorial, using python+libtcod"](http://www.roguebasin.com/index.php?title=Complete_Roguelike_Tutorial,_using_python%2Blibtcod).
+
 # cl-tcod
 
 The `cl-tcod` library provides an interface (wrapper) between Common Lisp and
