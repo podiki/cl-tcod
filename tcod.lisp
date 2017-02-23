@@ -1746,7 +1746,8 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 (defun* console-init-root ((width uint) (height uint)
                            &key (title "libtcod")
                                  (fullscreen? nil)
-                                 (renderer :RENDERER-GLSL))
+                           (renderer :RENDERER-SDL))
+  ;; use SDL by default, as that is all that seems to be supported in TCOD currently
   (check-type width ucoord)
   (check-type height ucoord)
   (setf (gethash *root* *console-width-table*) width)
