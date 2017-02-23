@@ -173,6 +173,8 @@
    #:key-ralt
    #:key-lctrl
    #:key-rctrl
+   #:key-lmeta
+   #:key-rmeta
    #:key-shift
    #:make-key
    #:make-simple-key
@@ -1069,9 +1071,16 @@ name."
 #-darwin
 (defcstruct key-press
   (vk keycode)
-  (c :unsigned-char)
-  (text :uint8 :count 32)
-  (flags :uint8))
+  (c :char)
+  (text :char :count 32)
+  (flag-pressed :bool)
+  (flag-lalt :bool)
+  (flag-lctrl :bool)
+  (flag-lmeta :bool)
+  (flag-ralt :bool)
+  (flag-rctrl :bool)
+  (flag-rmeta :bool)
+  (flag-shift :bool))
 
 ;;; Horrendous problems getting this to work on OSX. The `keycode' enum type
 ;;; must be a 4-byte int (forced in its definition above).
@@ -1083,8 +1092,10 @@ name."
   (flag-pressed :uint8)
   (flag-lalt :uint8)
   (flag-lctrl :uint8)
+  (flag-lmeta :uint8)
   (flag-ralt :uint8)
   (flag-rctrl :uint8)
+  (flag-rmeta :uint8)
   (flag-shift :uint8))
 
 
@@ -1096,8 +1107,10 @@ to the structure used by libtcod."
   (pressed nil :type boolean)
   (lalt nil :type boolean)
   (lctrl nil :type boolean)
+  (lmeta nil :type boolean)
   (ralt nil :type boolean)
   (rctrl nil :type boolean)
+  (rmeta nil :type boolean)
   (shift nil :type boolean))
 
 
@@ -1376,7 +1389,9 @@ defined by [[deftype]]."
        (eql (or (key-lalt key1) (key-ralt key1))
             (or (key-lalt key2) (key-ralt key2)))
        (eql (or (key-lctrl key1) (key-rctrl key1))
-            (or (key-lctrl key2) (key-rctrl key2)))))
+            (or (key-lctrl key2) (key-rctrl key2)))
+       (eql (or (key-lmeta key1) (key-rmeta key1))
+            (or (key-lmeta key2) (key-rmeta key2)))))
 
 
 
@@ -2374,22 +2389,25 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
 
 #-darwin
 (defun key->keypress (keyptr)
-  (let ((flags (foreign-slot-value keyptr '(:struct key-press) 'flags)))
-    (make-key
-     :vk (foreign-slot-value keyptr '(:struct key-press) 'vk)
-     :c (code-char (foreign-slot-value keyptr '(:struct key-press) 'c))
-     :pressed (get-bit flags 1)
-     :lalt (get-bit flags 2)
-     :lctrl (get-bit flags 3)
-     :ralt (get-bit flags 4)
-     :rctrl (get-bit flags 5)
-     :shift (get-bit flags 6))))
+  (with-foreign-slots ((vk c text flag-pressed flag-lalt flag-lctrl flag-lmeta flag-ralt
+                           flag-rctrl flag-rmeta flag-shift)
+                       keyptr (:struct key-press))
+    (make-key :vk vk
+              :c (code-char c)
+              :pressed flag-pressed
+              :lalt flag-lalt
+              :ralt flag-ralt
+              :lctrl flag-lctrl
+              :rctrl flag-rctrl
+              :lmeta flag-lmeta
+              :rmeta flag-rmeta
+              :shift flag-shift)))
 
 
 #+darwin
 (defun key->keypress (keyptr)
-  (with-foreign-slots ((vk c text flag-pressed flag-lalt flag-lctrl flag-ralt
-                           flag-rctrl flag-shift)
+  (with-foreign-slots ((vk c text flag-pressed flag-lalt flag-lctrl flag-lmeta flag-ralt
+                           flag-rctrl flag-rmeta flag-shift)
                        keyptr (:struct key-press))
     ;; (loop for i from 0 upto 45 do
     ;;   (format t "~D:~S " i (mem-ref keyptr :uint8 i)))
@@ -2400,6 +2418,8 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
               :ralt (not (zerop flag-ralt))
               :lctrl (not (zerop flag-lctrl))
               :rctrl (not (zerop flag-rctrl))
+              :lmeta (not (zerop flag-lmeta))
+              :rmeta (not (zerop flag-rmeta))
               :shift (not (zerop flag-shift)))))
 
 
