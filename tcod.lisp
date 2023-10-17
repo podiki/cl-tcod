@@ -1666,13 +1666,13 @@ a light grey colour, or raise an error (if `error?' is non-nil)."
   (colour-set-hsv con hue sat v))
 
 
-(define-c-function ("TCOD_color_get_hue_" colour-get-hue) :float
+(define-c-function ("TCOD_color_get_hue_wrapper" colour-get-hue) :float
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_saturation_" colour-get-saturation) :float
+(define-c-function ("TCOD_color_get_saturation_wrapper" colour-get-saturation) :float
     ((c colournum)))
 
-(define-c-function ("TCOD_color_get_value_" colour-get-value) :float
+(define-c-function ("TCOD_color_get_value_wrapper" colour-get-value) :float
     ((c colournum)))
 
 
