@@ -3496,7 +3496,7 @@ vector of the point at X, Y."
 
 ;; Example of how to define a lisp function which can be called from C,
 ;; for use with PATH-NEW-USING-FUNCTION.
-(defcallback my-a*-callback :float
+(defcallback my-a*-callback :boolean
     ((from-x :int) (from-y :int) (to-x :int) (to-y :int) (userdata :pointer))
   ;; In the function body: all args will have been converted to lisp.
   ;; The function's return value will be converted to C.
